@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Learning hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/style.css?v=20261115">
+<script src="assets/common.js?v=20261115"></script>
+<script src="assets/data.js?v=20261115"></script>
+</head>
+<body>
+  <header class="site-header narrow">
+    <div class="inner">
+      <a class="brand" href="index.html">
+        <span class="brand-mark"><svg class="icon" style="width:17px;height:17px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></span>
+        Learning hub
+      </a>
+      <button type="button" class="icon-btn" data-theme-toggle></button>
+    </div>
+  </header>
+
+  <main class="portal">
+    <div class="greet">
+      <h1 id="greeting">Chào bạn</h1>
+      <p id="greet-sub"></p>
+    </div>
+
+    <section class="stats-row" aria-label="Thời gian học">
+      <div class="panel goal">
+        <div class="panel-head"><strong>Mục tiêu mỗi ngày</strong><span id="goal-label"></span></div>
+        <div class="goal-now"><b id="today-time">0p</b><span id="today-of"></span></div>
+        <div class="progress"><span id="today-bar" style="width:0%"></span></div>
+        <div class="goal-stats">
+          <div><b id="streak">0</b><span>ngày liên tiếp đạt mục tiêu</span></div>
+          <div><b id="goal30">0/30</b><span>ngày đạt trong 30 ngày qua</span></div>
+          <div><b id="month-hours">0g</b><span id="month-label">đã học trong tháng này</span></div>
+        </div>
+      </div>
+
+      <div class="panel heat">
+        <div class="panel-head"><strong>Lịch học 26 tuần qua</strong><span id="heat-summary"></span></div>
+        <div class="heat-scroll"><div class="heat-grid" id="heatmap" role="img" aria-label="Biểu đồ nhiệt thời gian học theo ngày"></div></div>
+        <div class="heat-legend" aria-hidden="true">
+          <span>0g</span><i></i><i style="background:var(--h1)"></i><i style="background:var(--h2)"></i><i style="background:var(--h3)"></i><i style="background:var(--h4)"></i><span>3g+</span>
+          <span style="margin-left:12px;display:flex;align-items:center;gap:5px"><i style="background:transparent;box-shadow:inset 0 0 0 1.5px var(--text)"></i>hôm nay</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="section-head">
+      <div>
+        <h2>Topic</h2>
+        <p id="topic-count"></p>
+      </div>
+      <label class="field">
+        <span id="search-icon"></span>
+        <span class="sr-only">Tìm topic</span>
+        <input type="search" id="search" placeholder="Tìm topic…" autocomplete="off">
+      </label>
+    </div>
+
+    <div class="topic-grid" id="topics"></div>
+    <div class="empty" id="empty" hidden>Không có topic nào khớp.</div>
+  </main>
+
+  <footer class="site-footer"><div class="inner" id="footer">Learning hub</div></footer>
+
+  <script src="assets/portal.js?v=20261115"></script>
+</body>
+</html>

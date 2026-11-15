@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tên topic</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../assets/style.css?v=20261115">
+<script src="../assets/common.js?v=20261115"></script>
+<script src="../assets/data.js?v=20261115"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="../assets/topic.js?v=20261115"></script>
+</head>
+<!-- data-topic phải trùng với "id" của topic trong assets/data.js -->
+<body data-topic="ten-topic">
+<main id="lessons">
+
+  <!--
+    Mỗi bài là một <section class="lesson">:
+      id            → dùng cho link, ví dụ topics/ten-topic.html#gioi-thieu
+      data-part     → tên phần (gom nhóm trong menu trái)
+      data-title    → tiêu đề bài
+      data-minutes  → thời gian đọc (phút)
+      data-updated  → ngày cập nhật, dạng YYYY-MM-DD
+      data-done     → "true" khi đã học xong bài này
+      data-summary  → một câu mô tả, hiện ở thẻ "Bước tiếp theo"
+    Trong bài: h2 = mục (hiện ở "Trong bài này"), h3 = mục con.
+  -->
+  <section class="lesson" id="gioi-thieu" data-part="Nền tảng" data-title="Giới thiệu" data-minutes="5" data-updated="2026-11-15" data-done="false" data-summary="Một câu mô tả bài.">
+    <p>Đoạn mở đầu của bài.</p>
+
+    <div class="callout note"><p>Khung ghi chú. Đổi class thành <code>tip</code> hoặc <code>warning</code> cho mẹo và cảnh báo.</p></div>
+
+    <h2>Mục đầu tiên</h2>
+    <p>Nội dung.</p>
+
+    <pre data-file="vi-du.yaml"><code class="language-yaml">key: value</code></pre>
+
+    <table>
+      <thead><tr><th>Cột 1</th><th>Cột 2</th></tr></thead>
+      <tbody><tr><td>A</td><td>B</td></tr></tbody>
+    </table>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Câu hỏi?</summary><p>Đáp án.</p></details>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

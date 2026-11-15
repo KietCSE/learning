@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../assets/style.css?v=20261115">
+<script src="../assets/common.js?v=20261115"></script>
+<script src="../assets/data.js?v=20261115"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="../assets/topic.js?v=20261115"></script>
+</head>
+<body data-topic="kubernetes">
+<main id="lessons">
+
+  <section class="lesson" id="kubernetes-giai-quyet-gi" data-part="Nền tảng" data-title="Kubernetes giải quyết vấn đề gì" data-minutes="8" data-updated="2026-11-15" data-done="false" data-summary="Orchestrator là gì, trạng thái mong muốn và kiến trúc tổng quan của cluster.">
+    <p>Chạy vài container trên một máy thì Docker là đủ. Khi app chạy trên nhiều máy, câu hỏi đổi khác: container nên chạy ở máy nào, ai khởi động lại nó khi crash, làm sao tăng số bản sao khi tải lên, và làm sao cập nhật phiên bản mới mà không gián đoạn. Kubernetes là một <strong>container orchestrator</strong> trả lời những câu hỏi đó.</p>
+
+    <h2>Trạng thái mong muốn và vòng lặp điều hòa</h2>
+    <p>Bạn không ra lệnh “chạy container này trên máy kia”. Bạn khai báo <em>trạng thái mong muốn</em>, ví dụ “luôn có 3 bản sao nginx:1.27”, rồi gửi cho cluster. Các controller liên tục so sánh trạng thái thực tế với trạng thái mong muốn và hành động để kéo hai thứ về khớp nhau.</p>
+    <div class="callout note"><p>Mô hình này gọi là <em>reconciliation loop</em>. Nếu một Pod chết, controller thấy chỉ còn 2/3 bản sao và tạo Pod mới — không ai phải can thiệp.</p></div>
+
+    <h2>Những việc Kubernetes làm thay bạn</h2>
+    <table>
+      <thead><tr><th>Việc</th><th>Kubernetes làm thế nào</th></tr></thead>
+      <tbody>
+        <tr><td>Lên lịch</td><td>Scheduler chọn node còn đủ CPU, RAM theo resource request của Pod.</td></tr>
+        <tr><td>Tự phục hồi</td><td>Khởi động lại container lỗi, tạo Pod thay thế khi node chết.</td></tr>
+        <tr><td>Mở rộng</td><td>Đổi số <code>replicas</code>, hoặc để HorizontalPodAutoscaler tự chỉnh theo tải.</td></tr>
+        <tr><td>Định tuyến</td><td>Service cho một địa chỉ và tên DNS ổn định, chia tải tới các Pod phía sau.</td></tr>
+        <tr><td>Cập nhật</td><td>Deployment rollout dần từng Pod và cho phép rollback.</td></tr>
+        <tr><td>Cấu hình</td><td>ConfigMap và Secret tách cấu hình khỏi image.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Kiến trúc tổng quan</h2>
+    <p>Một cluster gồm <strong>control plane</strong> (bộ não) và các <strong>worker node</strong> (nơi container thật sự chạy).</p>
+    <h3>Control plane</h3>
+    <ul>
+      <li><code>kube-apiserver</code> — cửa duy nhất để đọc ghi trạng thái cluster; <code>kubectl</code> nói chuyện với nó.</li>
+      <li><code>etcd</code> — kho key-value lưu toàn bộ trạng thái cluster.</li>
+      <li><code>kube-scheduler</code> — chọn node cho Pod mới.</li>
+      <li><code>kube-controller-manager</code> — chạy các controller (Deployment, ReplicaSet, Node…).</li>
+    </ul>
+    <h3>Worker node</h3>
+    <ul>
+      <li><code>kubelet</code> — nhận danh sách Pod của node và đảm bảo container chạy đúng.</li>
+      <li>Container runtime — thường là <code>containerd</code>, kéo image và chạy container.</li>
+      <li><code>kube-proxy</code> — cài luật mạng để traffic tới Service đến được Pod.</li>
+    </ul>
+
+    <h2>Khi nào chưa cần Kubernetes</h2>
+    <div class="callout tip"><p>App nhỏ chạy trên một server thì <code>docker compose</code> thường là đủ. Kubernetes đáng công khi có nhiều service, nhiều máy, cần tự phục hồi và rollout an toàn — vì bản thân việc vận hành cluster cũng tốn công.</p></div>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>“Trạng thái mong muốn” khác gì so với chạy lệnh trực tiếp?</summary><p>Bạn mô tả kết quả cần có thay vì từng bước. Controller tự tìm cách đạt và giữ kết quả đó, kể cả khi có sự cố sau này.</p></details>
+      <details><summary>Thành phần nào lưu toàn bộ trạng thái cluster?</summary><p>etcd. Mọi thành phần khác đọc ghi trạng thái qua kube-apiserver, không chạm thẳng vào etcd.</p></details>
+      <details><summary>Ai thực sự khởi động container trên một node?</summary><p>kubelet nhận chỉ thị, còn container runtime (containerd) kéo image và chạy container.</p></details>
+    </div>
+  </section>
+
+  <section class="lesson" id="pod-va-vong-doi" data-part="Workload" data-title="Pod và vòng đời của Pod" data-minutes="12" data-updated="2026-11-15" data-done="false" data-summary="Viết Pod manifest, các phase trong vòng đời và liveness/readiness probe.">
+    <p>Pod là đơn vị nhỏ nhất mà Kubernetes triển khai và quản lý. Một Pod bọc một hoặc nhiều container chạy cùng nhau trên một node, dùng chung network namespace và volume. Bài này đi qua cách viết một Pod, các phase trong vòng đời của nó và cách dùng probe để cluster biết container còn khỏe hay không.</p>
+
+    <div class="callout note"><p>Trong thực tế hầu như không ai tạo Pod trực tiếp. Deployment, StatefulSet hay Job tạo Pod thay bạn và thay Pod mới khi Pod cũ chết. Hiểu Pod là để đọc được những gì các controller đó sinh ra.</p></div>
+
+    <h2>Pod là gì</h2>
+    <p>Có thể coi Pod như một “máy logic” nhỏ. Các container trong cùng một Pod:</p>
+    <ul>
+      <li>Có chung một địa chỉ IP và gọi nhau qua <code>localhost</code>.</li>
+      <li>Đọc ghi chung các volume khai báo ở cấp Pod.</li>
+      <li>Luôn được xếp lên cùng một node, khởi động và dừng như một khối.</li>
+    </ul>
+    <p>Mô hình này hợp với những tiến trình phải sống sát nhau, ví dụ app chính và một sidecar đẩy log hoặc một proxy mạng đi kèm.</p>
+
+    <h2>Viết Pod manifest</h2>
+    <p>Pod tối giản dưới đây chạy một container nginx, kèm label để Service tìm thấy sau này và resource request để scheduler biết cần chỗ bao nhiêu.</p>
+<pre data-file="web-pod.yaml"><code class="language-yaml">apiVersion: v1
+kind: Pod
+metadata:
+  name: web
+  labels:
+    app: web
+spec:
+  containers:
+    - name: nginx
+      image: nginx:1.27
+      ports:
+        - containerPort: 80
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "128Mi"</code></pre>
+    <p>Áp dụng manifest và theo dõi Pod:</p>
+<pre><code class="language-bash">kubectl apply -f web-pod.yaml
+kubectl get pod web -o wide      # node và IP của Pod
+kubectl describe pod web         # event: kéo image, lên lịch, probe
+kubectl logs web -f              # log của container</code></pre>
+
+    <h2>Vòng đời và các phase</h2>
+    <p>Trường <code>status.phase</code> tóm tắt Pod đang ở đâu trong vòng đời. Chỉ có năm giá trị:</p>
+    <table>
+      <thead><tr><th style="width:130px">Phase</th><th>Ý nghĩa</th></tr></thead>
+      <tbody>
+        <tr><td><code>Pending</code></td><td>Cluster đã nhận Pod nhưng chưa container nào chạy: đang chờ lên lịch hoặc đang kéo image.</td></tr>
+        <tr><td><code>Running</code></td><td>Pod đã gắn vào node, ít nhất một container đang chạy, khởi động hoặc khởi động lại.</td></tr>
+        <tr><td><code>Succeeded</code></td><td>Mọi container đã kết thúc thành công và sẽ không khởi động lại.</td></tr>
+        <tr><td><code>Failed</code></td><td>Mọi container đã dừng, ít nhất một container thoát với lỗi.</td></tr>
+        <tr><td><code>Unknown</code></td><td>Không lấy được trạng thái, thường do mất liên lạc với node.</td></tr>
+      </tbody>
+    </table>
+    <div class="callout warning"><p><code>CrashLoopBackOff</code> không phải là phase. Đó là lý do một container đang phải chờ trước lần khởi động lại tiếp theo sau nhiều lần crash. Pod lúc đó thường vẫn ở phase <code>Running</code>.</p></div>
+
+    <h2>Liveness, readiness và startup probe</h2>
+    <p>kubelet dùng probe để hỏi container định kỳ. Mỗi loại dẫn tới một hành động khác nhau khi thất bại:</p>
+    <ul>
+      <li><strong>Liveness</strong> — thất bại thì kubelet khởi động lại container.</li>
+      <li><strong>Readiness</strong> — thất bại thì Pod bị gỡ khỏi endpoint của Service, không bị khởi động lại.</li>
+      <li><strong>Startup</strong> — tạm hoãn hai probe trên cho tới khi app khởi động xong.</li>
+    </ul>
+<pre data-file="thêm vào container nginx"><code class="language-yaml">readinessProbe:
+  httpGet:
+    path: /
+    port: 80
+  periodSeconds: 5
+livenessProbe:
+  httpGet:
+    path: /
+    port: 80
+  initialDelaySeconds: 10
+  failureThreshold: 3</code></pre>
+    <div class="callout tip"><p>Đừng trỏ liveness probe vào endpoint có gọi database. Database chậm một chút là các Pod bị restart dây chuyền. Liveness chỉ nên trả lời câu hỏi “tiến trình còn sống không”.</p></div>
+
+    <h2>Tự kiểm tra</h2>
+    <p>Nghĩ câu trả lời trước rồi mở ra xem.</p>
+    <div class="qa-list">
+      <details><summary>Hai container trong cùng Pod gọi nhau bằng địa chỉ nào?</summary><p>localhost — chúng dùng chung network namespace nên chung IP và dải port. Hai container không được mở trùng port.</p></details>
+      <details><summary>Pod đang báo CrashLoopBackOff thì phase của nó là gì?</summary><p>Thường vẫn là Running. CrashLoopBackOff là lý do chờ của container, không phải phase của Pod.</p></details>
+      <details><summary>App cần 60 giây để nạp cache khi khởi động. Dùng probe nào để không bị restart oan?</summary><p>startupProbe. Khi nó chưa thành công, liveness và readiness chưa chạy.</p></details>
+    </div>
+
+    <p style="margin-top:28px;font-size:14px;color:var(--muted)">Tài liệu gốc: <a href="https://kubernetes.io/docs/concepts/workloads/pods/">Pods</a> · <a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/">Pod Lifecycle</a> — kubernetes.io</p>
+  </section>
+
+</main>
+</body>
+</html>
