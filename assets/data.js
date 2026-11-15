@@ -21,10 +21,11 @@ window.LEARNING = {
       title: "Kubernetes",
       category: "DevOps",
       status: "learning",
-      desc: "Pod, Deployment, Service và cách cluster điều phối container.",
+      desc: "9 bài cốt lõi học kỹ từng bước (Pod, Deployment, Service, ConfigMap, Ingress, debug, dựng app) và 6 bài tra cứu khi cần.",
       file: "topics/kubernetes.html",
-      lessons: 2,
+      lessons: 15,
       done: 0,
+      estimate: "≈ 10 giờ",
       updated: "2026-11-15"
     }
   ]

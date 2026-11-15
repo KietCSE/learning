@@ -129,7 +129,7 @@
       '<div class="top"><span class="title">' + LH.esc(t.title) + '</span><span class="pill ' + t.status + '">' + (STATUS[t.status] || "") + "</span></div>" +
       "<p>" + LH.esc(t.desc) + "</p>" +
       '<div class="foot"><span class="progress ' + t.status + '"><span style="width:' + pct + '%"></span></span>' +
-      "<span>" + (total ? done + "/" + total + " bài" : "Chưa có bài") + "</span></div>" +
+      "<span>" + (total ? done + "/" + total + " bài" : "Chưa có bài") + (t.estimate ? " · " + LH.esc(t.estimate) : "") + "</span></div>" +
       "</" + tag + ">";
   }
   function render(q) {

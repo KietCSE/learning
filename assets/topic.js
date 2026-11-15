@@ -21,6 +21,8 @@
     });
     var doneCount = lessons.filter(function (s) { return s.dataset.done === "true"; }).length;
     var total = lessons.length;
+    var totalMin = lessons.reduce(function (a, s) { return a + (+s.dataset.minutes || 0) + (+s.dataset.practice || 0); }, 0);
+    var hoursLabel = totalMin ? " · ≈ " + Math.round(totalMin / 60) + " giờ học" : "";
 
     /* ---------- page chrome ---------- */
     var shell = document.createElement("div");
@@ -30,7 +32,7 @@
         '<button type="button" class="icon-btn" data-theme-toggle></button>' +
       "</div></header>" +
       '<div class="subbar"><div class="inner">' +
-        '<div class="name"><button type="button" class="nav-toggle" aria-expanded="false" aria-controls="lesson-nav">' + I.list + "Bài học</button><b>" + esc(topicTitle) + "</b><span>" + esc(topic.category ? topic.category + " · " : "") + total + " bài</span></div>" +
+        '<div class="name"><button type="button" class="nav-toggle" aria-expanded="false" aria-controls="lesson-nav">' + I.list + "Bài học</button><b>" + esc(topicTitle) + "</b><span>" + esc(topic.category ? topic.category + " · " : "") + total + " bài" + hoursLabel + "</span></div>" +
         '<div class="prog"><span>Đã học ' + doneCount + "/" + total + '</span><span class="progress"><span style="width:' + (total ? Math.round(doneCount / total * 100) : 0) + '%"></span></span></div>' +
       "</div></div>" +
       '<div class="layout">' +
@@ -82,6 +84,32 @@
         if (window.hljs && m && m !== "text" && m !== "plaintext") {
           try { window.hljs.highlightElement(code); } catch (e) {}
         }
+        // data-add="3,5-7": highlight lines that were just added in this step.
+        var add = pre.getAttribute("data-add");
+        if (add) {
+          var set = {};
+          add.split(",").forEach(function (part) {
+            var r = part.trim().split("-"), a = parseInt(r[0], 10), b = parseInt(r[1] || r[0], 10);
+            for (var i = a; i <= b; i++) set[i] = true;
+          });
+          code.innerHTML = code.innerHTML.replace(/\n$/, "").split("\n").map(function (line, i) {
+            return '<span class="ln' + (set[i + 1] ? " add" : "") + '">' + (line || "​") + "</span>";
+          }).join("");
+          var tag = document.createElement("span"); tag.className = "added"; tag.textContent = "■ dòng mới thêm";
+          wrap.querySelector(".bar > span").appendChild(tag);
+        }
+      });
+      s.querySelectorAll(".term").forEach(function (t) {
+        var pre = t.querySelector("pre");
+        if (!pre) return;
+        pre.innerHTML = pre.innerHTML.replace(/^\n/, "").split("\n").map(function (line) {
+          if (/^\$ /.test(line)) return '<span class="p">$</span> <span class="cmd">' + line.slice(2) + "</span>";
+          if (/^# /.test(line)) return '<span class="cm">' + line + "</span>";
+          return line;
+        }).join("\n");
+        var bar = document.createElement("div"); bar.className = "term-bar";
+        bar.innerHTML = "<i></i><i></i><i></i><span>" + esc(t.getAttribute("data-title") || "Terminal") + "</span><em>ví dụ output</em>";
+        t.insertBefore(bar, pre);
       });
       s.querySelectorAll("table").forEach(function (t) {
         if (t.parentElement.classList.contains("table-wrap")) return;
@@ -167,7 +195,11 @@
       groupsEl.querySelectorAll("a[data-lesson]").forEach(function (a) {
         var cur = a.getAttribute("data-lesson") === id;
         a.classList.toggle("current", cur);
-        if (cur) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+        if (cur) {
+          a.setAttribute("aria-current", "page");
+          var r = a.getBoundingClientRect(), nr = nav.getBoundingClientRect();
+          if (r.top < nr.top || r.bottom > nr.bottom) nav.scrollTop += r.top - nr.top - nr.height / 3;
+        } else a.removeAttribute("aria-current");
       });
 
       var title = s.dataset.title || "";
@@ -178,7 +210,8 @@
         "<li><a href=\"#" + lessons[0].id + "\">" + esc(topicTitle) + "</a></li>" +
         (s.dataset.part ? '<li aria-hidden="true">/</li><li>' + esc(s.dataset.part) + "</li>" : "");
       var meta = '<span class="pill' + (s.dataset.done === "true" ? " done" : "") + '">Bài ' + (idx + 1) + " / " + total + (s.dataset.done === "true" ? " · đã học" : "") + "</span>";
-      if (s.dataset.minutes) meta += "<span>" + I.clock + s.dataset.minutes + " phút đọc</span>";
+      if (s.dataset.minutes) meta += "<span>" + I.clock + "Đọc " + s.dataset.minutes + " phút</span>";
+      if (+s.dataset.practice > 0) meta += "<span>" + I.terminal + "Thực hành " + s.dataset.practice + " phút</span>";
       if (s.dataset.updated) meta += "<span>" + I.calendar + "Cập nhật " + esc(LH.viDate(s.dataset.updated)) + "</span>";
       document.getElementById("lesson-meta").innerHTML = meta;
 

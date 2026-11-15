@@ -43,7 +43,8 @@
     info: svg('<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>'),
     bulb: svg('<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6M10 22h4"/>'),
     alert: svg('<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/>'),
-    list: svg('<path d="M3 12h18M3 6h18M3 18h18"/>')
+    list: svg('<path d="M3 12h18M3 6h18M3 18h18"/>'),
+    terminal: svg('<path d="m4 17 6-6-6-6"/><path d="M12 19h8"/>')
   };
 
   function fmtMinutes(min) {

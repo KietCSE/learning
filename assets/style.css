@@ -221,6 +221,47 @@ div.topic-card .title { color: var(--text); }
 .hljs-title, .hljs-function, .hljs-name { color: var(--c-fn); }
 .hljs-deletion { color: #D1242F; }
 
+/* sơ đồ SVG vẽ tay, đổi màu theo theme: <figure class="diagram"><svg class="dg">…</svg><figcaption>…</figcaption></figure> */
+.diagram { margin: 8px 0 22px; padding: 16px 16px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.diagram svg { display: block; width: 100%; height: auto; }
+.diagram figcaption { margin-top: 10px; font-size: 13px; color: var(--muted); text-align: center; line-height: 1.5; }
+.dg { font-family: var(--font); }
+.dg text { fill: var(--text); font-size: 13px; }
+.dg .b { font-weight: 600; }
+.dg .s { fill: var(--muted); font-size: 11.5px; }
+.dg .m { font-family: var(--mono); font-size: 11.5px; }
+.dg .a { fill: var(--accent); }
+.dg .box { fill: var(--card); stroke: var(--line2); stroke-width: 1.2; }
+.dg .zone { fill: var(--alt); stroke: var(--line2); stroke-width: 1; }
+.dg .acc { fill: var(--accent-soft); stroke: var(--accent-line); stroke-width: 1.2; }
+.dg .ok { fill: var(--ok-soft); stroke: var(--ok-line); stroke-width: 1.2; }
+.dg .warn { fill: var(--warn-soft); stroke: var(--warn-line); stroke-width: 1.2; }
+.dg .ghost { fill: none; stroke: var(--line2); stroke-width: 1.2; stroke-dasharray: 5 4; }
+.dg .ln { fill: none; stroke: var(--muted); stroke-width: 1.4; }
+.dg .ln-a { fill: none; stroke: var(--accent); stroke-width: 1.6; }
+.dg .dash { stroke-dasharray: 5 4; }
+.dg .head { fill: var(--muted); }
+.dg .head-a { fill: var(--accent); }
+
+/* dòng mới thêm trong code (pre data-add="3,5-7") */
+.codeblock code .ln { display: block; min-height: 1.65em; }
+.codeblock code .ln.add { background: var(--ok-soft); margin: 0 -16px; padding: 0 16px 0 13px; border-left: 3px solid var(--ok); }
+.codeblock .bar .added { color: var(--ok); font-size: 12px; font-weight: 500; margin-left: 10px; }
+
+/* khung terminal: <div class="term" data-title="..."><pre>$ lệnh\noutput</pre></div> */
+.term { border-radius: 10px; overflow: hidden; margin: 0 0 16px; background: #0D1117; border: 1px solid #262C36; box-shadow: 0 6px 18px rgba(0, 0, 0, .12); }
+.term-bar { display: flex; align-items: center; gap: 7px; height: 34px; padding: 0 12px; background: #161B22; border-bottom: 1px solid #262C36; font-size: 12px; color: #8B949E; }
+.term-bar i { width: 11px; height: 11px; border-radius: 50%; background: #FF5F57; }
+.term-bar i:nth-child(2) { background: #FEBC2E; } .term-bar i:nth-child(3) { background: #28C840; }
+.term-bar span { margin-left: 8px; flex: 1; }
+.term-bar em { font-style: normal; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: #21262D; color: #8B949E; }
+.term pre { margin: 0; padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: 13px; line-height: 1.6; color: #C9D1D9; white-space: pre; }
+.term .p { color: #3FB950; font-weight: 600; user-select: none; }
+.term .cmd { color: #F0F6FC; font-weight: 500; }
+.term .cm { color: #8B949E; font-style: italic; }
+.term .hl { color: #F2CC60; }
+.term .ok { color: #3FB950; } .term .err { color: #FF7B72; }
+
 .callout { border-radius: 8px; padding: 14px 18px; margin: 0 0 16px; border: 1px solid var(--accent-line); background: var(--accent-soft); }
 .callout > :last-child { margin-bottom: 0; }
 .callout .callout-title { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; margin-bottom: 4px; color: var(--accent); }

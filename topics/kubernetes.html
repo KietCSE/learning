@@ -7,143 +7,2077 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="../assets/style.css?v=20261115-2">
-<script src="../assets/common.js?v=20261115-2"></script>
-<script src="../assets/data.js?v=20261115-2"></script>
+<link rel="stylesheet" href="../assets/style.css?v=20261115-6">
+<script src="../assets/common.js?v=20261115-6"></script>
+<script src="../assets/data.js?v=20261115-6"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-<script src="../assets/topic.js?v=20261115-2"></script>
+<script src="../assets/topic.js?v=20261115-6"></script>
 </head>
 <body data-topic="kubernetes">
 <main id="lessons">
+  <!-- ===================== PHẦN 1 · CỐT LÕI (80/20) ===================== -->
 
-  <section class="lesson" id="kubernetes-giai-quyet-gi" data-part="Nền tảng" data-title="Kubernetes giải quyết vấn đề gì" data-minutes="8" data-updated="2026-11-15" data-done="false" data-summary="Orchestrator là gì, trạng thái mong muốn và kiến trúc tổng quan của cluster.">
-    <p>Chạy vài container trên một máy thì Docker là đủ. Khi app chạy trên nhiều máy, câu hỏi đổi khác: container nên chạy ở máy nào, ai khởi động lại nó khi crash, làm sao tăng số bản sao khi tải lên, và làm sao cập nhật phiên bản mới mà không gián đoạn. Kubernetes là một <strong>container orchestrator</strong> trả lời những câu hỏi đó.</p>
+  <section class="lesson" id="kubernetes-la-gi" data-part="1 · Cốt lõi" data-title="Kubernetes là gì và giải quyết vấn đề gì" data-minutes="12" data-practice="0" data-updated="2026-11-15" data-done="false" data-summary="Vì sao cần Kubernetes, các từ vựng cơ bản và chuyện gì xảy ra khi chạy một lệnh.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li>Kubernetes (viết tắt <strong>k8s</strong>) chạy và trông coi container trên <em>nhiều máy</em>.</li>
+        <li>Mình không ra lệnh từng bước. Mình viết YAML mô tả <strong>kết quả mong muốn</strong>, Kubernetes tự làm cho thực tế khớp với nó — và giữ như vậy mãi.</li>
+        <li>Từ vựng tối thiểu: <strong>cluster</strong> (cả hệ thống), <strong>node</strong> (một máy), <strong>Pod</strong> (nơi container chạy).</li>
+      </ul>
+    </div>
 
-    <h2>Trạng thái mong muốn và vòng lặp điều hòa</h2>
-    <p>Bạn không ra lệnh “chạy container này trên máy kia”. Bạn khai báo <em>trạng thái mong muốn</em>, ví dụ “luôn có 3 bản sao nginx:1.27”, rồi gửi cho cluster. Các controller liên tục so sánh trạng thái thực tế với trạng thái mong muốn và hành động để kéo hai thứ về khớp nhau.</p>
-    <div class="callout note"><p>Mô hình này gọi là <em>reconciliation loop</em>. Nếu một Pod chết, controller thấy chỉ còn 2/3 bản sao và tạo Pod mới — không ai phải can thiệp.</p></div>
+    <h2>Bắt đầu từ thứ mình đã biết: Docker</h2>
+    <p>Với Docker, chạy một app web rất đơn giản:</p>
+<pre><code class="language-bash">docker run -d -p 80:9898 ghcr.io/stefanprodan/podinfo:6.7.0</code></pre>
+    <p>Một máy, một lệnh, xong. Nhưng hãy tưởng tượng app này lên production và có người dùng thật:</p>
+    <ul>
+      <li><strong>Container crash lúc 3 giờ sáng.</strong> Ai khởi động lại? <code>--restart=always</code> giúp được trên một máy — nhưng nếu chính <em>máy</em> chết thì sao?</li>
+      <li><strong>Lượng truy cập tăng gấp 5.</strong> Cần chạy 10 bản trên 3 máy. Bản nào chạy máy nào? Máy nào còn RAM?</li>
+      <li><strong>Ra phiên bản mới.</strong> Dừng 10 container cũ, chạy 10 container mới — người dùng thấy lỗi trong lúc đổi.</li>
+      <li><strong>Các app gọi nhau.</strong> Container đổi IP mỗi lần khởi động lại, app khác biết gọi vào đâu?</li>
+    </ul>
+    <p>Làm tay thì mỗi việc trên là một đống script. Kubernetes gom tất cả lại thành một hệ thống.</p>
 
-    <h2>Những việc Kubernetes làm thay bạn</h2>
+    <h2>Ý tưởng cốt lõi: trạng thái mong muốn</h2>
+    <p>Đây là thứ mình thấy quan trọng nhất, hiểu được nó thì mọi thứ khác dễ theo.</p>
+    <p>Hình dung Kubernetes là <strong>quản lý một nhà hàng</strong>. Mình không nói với quản lý “gọi anh A tới bếp số 2 lúc 6 giờ”. Mình chỉ nói: <em>“ca tối luôn cần 3 đầu bếp”</em>. Quản lý tự xếp người, ai nghỉ ốm thì gọi người khác thay. Mình chỉ quan tâm <strong>kết quả</strong>.</p>
+    <p>Với Kubernetes cũng vậy. Mình viết một file:</p>
+<pre data-file="mong-muon.yaml"><code class="language-yaml"># "Tôi muốn luôn có 3 bản podinfo đang chạy"
+kind: Deployment
+spec:
+  replicas: 3
+  # ... image: podinfo:6.7.0</code></pre>
+    <p>Sau đó Kubernetes chạy một vòng lặp không bao giờ dừng:</p>
+    <figure class="diagram">
+      <svg class="dg" viewBox="0 0 720 205" role="img" aria-label="Vòng lặp điều hòa: quan sát, so sánh, hành động"><defs><marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="aa2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<text x="360" y="22" class="s" text-anchor="middle">mong muốn đã khai báo: replicas: 3</text>
+<rect class="acc" x="20" y="40" width="196" height="78" rx="8"/>
+<text x="36" y="70" class="b">1. Quan sát</text>
+<text x="36" y="92" class="s">thực tế: đang có 2 Pod</text>
+<rect class="box" x="262" y="40" width="196" height="78" rx="8"/>
+<text x="278" y="70" class="b">2. So sánh</text>
+<text x="278" y="92" class="s">mong muốn 3 → thiếu 1 Pod</text>
+<rect class="ok" x="504" y="40" width="196" height="78" rx="8"/>
+<text x="520" y="70" class="b">3. Hành động</text>
+<text x="520" y="92" class="s">tạo thêm 1 Pod</text>
+<path class="ln" d="M216,79 H258" marker-end="url(#ah2)"/>
+<path class="ln" d="M458,79 H500" marker-end="url(#ah2)"/>
+<path class="ln-a" d="M602,118 V168 H118 V122" marker-end="url(#aa2)"/>
+<text x="360" y="190" class="s" text-anchor="middle">lặp lại liên tục, vài giây một lần</text>
+      </svg>
+      <figcaption>Vòng lặp điều hòa: Kubernetes không chạy lệnh một lần rồi thôi, mà liên tục kéo thực tế về khớp với mong muốn.</figcaption>
+    </figure>
+    <p>Vì vậy nếu một container chết, hay cả một máy chết, mình không phải làm gì: vòng lặp thấy thiếu và tự bù. Vòng lặp này gọi là <strong>reconciliation loop</strong> (vòng lặp điều hòa).</p>
+
     <table>
-      <thead><tr><th>Việc</th><th>Kubernetes làm thế nào</th></tr></thead>
+      <thead><tr><th>Việc</th><th>Với Docker (làm tay)</th><th>Với Kubernetes</th></tr></thead>
       <tbody>
-        <tr><td>Lên lịch</td><td>Scheduler chọn node còn đủ CPU, RAM theo resource request của Pod.</td></tr>
-        <tr><td>Tự phục hồi</td><td>Khởi động lại container lỗi, tạo Pod thay thế khi node chết.</td></tr>
-        <tr><td>Mở rộng</td><td>Đổi số <code>replicas</code>, hoặc để HorizontalPodAutoscaler tự chỉnh theo tải.</td></tr>
-        <tr><td>Định tuyến</td><td>Service cho một địa chỉ và tên DNS ổn định, chia tải tới các Pod phía sau.</td></tr>
-        <tr><td>Cập nhật</td><td>Deployment rollout dần từng Pod và cho phép rollback.</td></tr>
-        <tr><td>Cấu hình</td><td>ConfigMap và Secret tách cấu hình khỏi image.</td></tr>
+        <tr><td>Chạy 3 bản</td><td>Chạy 3 lệnh <code>docker run</code>, tự chọn máy</td><td>Ghi <code>replicas: 3</code></td></tr>
+        <tr><td>Container chết</td><td>Tự phát hiện, tự chạy lại</td><td>Tự động tạo lại</td></tr>
+        <tr><td>Cập nhật phiên bản</td><td>Dừng cũ, chạy mới, có downtime</td><td>Đổi tag image, thay dần từng bản</td></tr>
+        <tr><td>App gọi nhau</td><td>Tự quản lý IP</td><td>Gọi bằng tên cố định (Service)</td></tr>
       </tbody>
     </table>
 
-    <h2>Kiến trúc tổng quan</h2>
-    <p>Một cluster gồm <strong>control plane</strong> (bộ não) và các <strong>worker node</strong> (nơi container thật sự chạy).</p>
-    <h3>Control plane</h3>
+    <h2>Từ vựng: cluster, node, Pod</h2>
+    <figure class="diagram">
+      <svg class="dg" viewBox="0 0 720 330" role="img" aria-label="Sơ đồ cluster: control plane và các node chạy Pod"><defs><marker id="ah1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="aa1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="zone" x="8" y="8" width="704" height="314" rx="14"/>
+<text x="26" y="32" class="b">Cluster</text>
+<rect class="acc" x="26" y="46" width="236" height="262" rx="10"/>
+<text x="42" y="70" class="b">Control plane</text>
+<text x="42" y="88" class="s">“bộ não”: quản lý, không chạy app</text>
+<rect class="box" x="42" y="100" width="204" height="40" rx="8"/>
+<text x="54" y="117" class="b m">kube-apiserver</text>
+<text x="54" y="132" class="s">cửa nhận mọi lệnh</text>
+<rect class="box" x="42" y="148" width="204" height="40" rx="8"/>
+<text x="54" y="165" class="b m">etcd</text>
+<text x="54" y="180" class="s">lưu toàn bộ trạng thái</text>
+<rect class="box" x="42" y="196" width="204" height="40" rx="8"/>
+<text x="54" y="213" class="b m">scheduler</text>
+<text x="54" y="228" class="s">chọn node cho Pod</text>
+<rect class="box" x="42" y="244" width="204" height="40" rx="8"/>
+<text x="54" y="261" class="b m">controller-manager</text>
+<text x="54" y="276" class="s">các vòng lặp điều hòa</text>
+<rect class="box" x="290" y="46" width="200" height="262" rx="10"/>
+<text x="306" y="70" class="b">Node 1</text>
+<text x="306" y="88" class="s">máy chạy container</text>
+<rect class="zone" x="306" y="100" width="168" height="34" rx="6"/>
+<text x="318" y="121" class="m">kubelet + containerd</text>
+<rect class="ok" x="306" y="150" width="168" height="62" rx="8"/>
+<text x="320" y="174" class="b">Pod</text>
+<text x="320" y="192" class="s">container của app</text>
+<rect class="ok" x="306" y="226" width="168" height="62" rx="8"/>
+<text x="320" y="250" class="b">Pod</text>
+<text x="320" y="268" class="s">container của app</text>
+<rect class="box" x="506" y="46" width="196" height="262" rx="10"/>
+<text x="522" y="70" class="b">Node 2</text>
+<text x="522" y="88" class="s">máy chạy container</text>
+<rect class="zone" x="522" y="100" width="164" height="34" rx="6"/>
+<text x="534" y="121" class="m">kubelet + containerd</text>
+<rect class="ok" x="522" y="150" width="164" height="62" rx="8"/>
+<text x="536" y="174" class="b">Pod</text>
+<text x="536" y="192" class="s">container của app</text>
+<path class="ln-a" d="M246,120 L302,117" marker-end="url(#aa1)"/>
+<path class="ln-a dash" d="M246,108 H276 V30 H604 V96" marker-end="url(#aa1)"/>
+<text x="440" y="24" class="s" text-anchor="middle">api-server giao Pod cho kubelet của từng node</text>
+      </svg>
+      <figcaption>Control plane quyết định, các node chạy container. Mỗi node có kubelet nhận việc từ api-server.</figcaption>
+    </figure>
     <ul>
-      <li><code>kube-apiserver</code> — cửa duy nhất để đọc ghi trạng thái cluster; <code>kubectl</code> nói chuyện với nó.</li>
-      <li><code>etcd</code> — kho key-value lưu toàn bộ trạng thái cluster.</li>
-      <li><code>kube-scheduler</code> — chọn node cho Pod mới.</li>
-      <li><code>kube-controller-manager</code> — chạy các controller (Deployment, ReplicaSet, Node…).</li>
+      <li><strong>Cluster</strong> — cả hệ thống: một nhóm máy làm việc chung, nhìn từ ngoài như một khối.</li>
+      <li><strong>Node</strong> — một máy trong cluster (máy thật hoặc máy ảo). Mình hiếm khi quan tâm Pod chạy ở node nào — đó là việc của Kubernetes.</li>
+      <li><strong>Control plane</strong> — các thành phần “quản lý”: <code>kube-apiserver</code> (cửa nhận mọi lệnh), <code>etcd</code> (cơ sở dữ liệu lưu trạng thái), <code>scheduler</code> (chọn node cho Pod), <code>controller-manager</code> (chạy các vòng lặp điều hòa).</li>
+      <li><strong>Pod</strong> — đơn vị nhỏ nhất Kubernetes quản lý, bọc một (thường là một) container. Bài 3 nói kỹ.</li>
     </ul>
-    <h3>Worker node</h3>
-    <ul>
-      <li><code>kubelet</code> — nhận danh sách Pod của node và đảm bảo container chạy đúng.</li>
-      <li>Container runtime — thường là <code>containerd</code>, kéo image và chạy container.</li>
-      <li><code>kube-proxy</code> — cài luật mạng để traffic tới Service đến được Pod.</li>
-    </ul>
+    <div class="callout tip" data-title="Mình hiểu sai lúc đầu"><p>Mình từng nghĩ Kubernetes thay thế Docker. Không phải. Mình vẫn build image bằng Docker như cũ; Kubernetes chỉ là người <em>chạy và trông coi</em> các image đó trên nhiều máy. Trên cloud (EKS, GKE, AKS), control plane do nhà cung cấp lo — mình chỉ làm việc với các object.</p></div>
 
-    <h2>Khi nào chưa cần Kubernetes</h2>
-    <div class="callout tip"><p>App nhỏ chạy trên một server thì <code>docker compose</code> thường là đủ. Kubernetes đáng công khi có nhiều service, nhiều máy, cần tự phục hồi và rollout an toàn — vì bản thân việc vận hành cluster cũng tốn công.</p></div>
+    <h2>Chuyện gì xảy ra khi gõ <code>kubectl apply</code></h2>
+    <p><code>kubectl</code> là công cụ dòng lệnh để nói chuyện với cluster. Khi gõ <code>kubectl apply -f app.yaml</code>:</p>
+    <ol>
+      <li><strong>kubectl</strong> gửi nội dung file tới <strong>api-server</strong>.</li>
+      <li>api-server kiểm tra hợp lệ rồi lưu vào <strong>etcd</strong>: “mong muốn: 3 bản podinfo”.</li>
+      <li><strong>Controller</strong> thấy mong muốn mới, tạo ra 3 Pod (lúc này chưa chạy ở đâu cả).</li>
+      <li><strong>Scheduler</strong> thấy 3 Pod chưa có chỗ, chọn node còn đủ CPU/RAM cho từng Pod.</li>
+      <li>Trên mỗi node, <strong>kubelet</strong> (một chương trình nhỏ chạy trên node) thấy có Pod được giao cho mình, kéo image và khởi động container.</li>
+    </ol>
+        <figure class="diagram">
+      <svg class="dg" viewBox="0 0 720 240" role="img" aria-label="Luồng xử lý khi chạy kubectl apply"><defs><marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="aa3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="box" x="20" y="24" width="150" height="56" rx="8"/>
+<text x="95" y="48" class="b m" text-anchor="middle">kubectl</text>
+<text x="95" y="66" class="s" text-anchor="middle">mình gõ lệnh</text>
+<rect class="acc" x="285" y="24" width="150" height="56" rx="8"/>
+<text x="360" y="48" class="b m" text-anchor="middle">kube-apiserver</text>
+<text x="360" y="66" class="s" text-anchor="middle">kiểm tra, ghi nhận</text>
+<rect class="box" x="550" y="24" width="150" height="56" rx="8"/>
+<text x="625" y="48" class="b m" text-anchor="middle">etcd</text>
+<text x="625" y="66" class="s" text-anchor="middle">lưu “mong muốn”</text>
+<rect class="box" x="20" y="170" width="150" height="56" rx="8"/>
+<text x="95" y="194" class="b m" text-anchor="middle">controller</text>
+<text x="95" y="212" class="s" text-anchor="middle">③ tạo 3 Pod mới</text>
+<rect class="box" x="285" y="170" width="150" height="56" rx="8"/>
+<text x="360" y="194" class="b m" text-anchor="middle">scheduler</text>
+<text x="360" y="212" class="s" text-anchor="middle">④ chọn node cho Pod</text>
+<rect class="ok" x="550" y="170" width="150" height="56" rx="8"/>
+<text x="625" y="194" class="b m" text-anchor="middle">kubelet (trên node)</text>
+<text x="625" y="212" class="s" text-anchor="middle">⑤ kéo image, chạy</text>
+<path class="ln-a" d="M170,52 H281" marker-end="url(#aa3)"/>
+<text x="226" y="44" class="s a" text-anchor="middle">① gửi YAML</text>
+<path class="ln" d="M435,52 H546" marker-end="url(#ah3)"/>
+<text x="490" y="44" class="s" text-anchor="middle">② lưu</text>
+<path class="ln dash" d="M330,80 L112,166" marker-end="url(#ah3)"/>
+<path class="ln dash" d="M360,80 V166" marker-end="url(#ah3)"/>
+<path class="ln dash" d="M390,80 L608,166" marker-end="url(#ah3)"/>
+<text x="368" y="128" class="s">theo dõi api-server</text>
+      </svg>
+      <figcaption>Các thành phần trong cluster không gọi nhau trực tiếp: chúng cùng theo dõi api-server và tự làm phần việc của mình.</figcaption>
+    </figure>
+    <p>Mình chỉ làm bước 1. Mọi thứ còn lại diễn ra tự động trong vài giây.</p>
+
+    <h2>6 object mình sẽ dùng 80% thời gian</h2>
+    <p>Mọi thứ trong Kubernetes là một <strong>object</strong> (đối tượng) được mô tả bằng YAML. Có hàng chục loại, nhưng công việc hằng ngày gần như chỉ xoay quanh 6 loại — và đó chính là nội dung Phần 1:</p>
+    <table>
+      <thead><tr><th>Object</th><th>Trả lời câu hỏi</th><th>Bài</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Pod</strong></td><td>Container của tôi đang chạy ở đâu?</td><td>3</td></tr>
+        <tr><td><strong>Deployment</strong></td><td>Chạy mấy bản? Cập nhật phiên bản thế nào?</td><td>4</td></tr>
+        <tr><td><strong>Service</strong></td><td>App khác gọi app này bằng địa chỉ nào?</td><td>5</td></tr>
+        <tr><td><strong>ConfigMap / Secret</strong></td><td>Cấu hình và mật khẩu để ở đâu?</td><td>6</td></tr>
+        <tr><td><strong>Ingress</strong></td><td>Người dùng bên ngoài vào bằng domain nào?</td><td>7</td></tr>
+        <tr><td><strong>Namespace</strong></td><td>Chia cluster theo team/môi trường thế nào?</td><td>2</td></tr>
+      </tbody>
+    </table>
+    <p>Đến cuối Phần 1, các mảnh này ghép lại thành hình dạng mà gần như mọi app web trên Kubernetes đều có:</p>
+    <figure class="diagram">
+      <svg class="dg" viewBox="0 0 720 230" role="img" aria-label="Đường đi của request: Ingress, Service, các Pod"><defs><marker id="ah4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="aa4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="box" x="10" y="87" width="112" height="56" rx="8"/>
+<text x="66" y="110" class="b" text-anchor="middle">Người dùng</text>
+<text x="66" y="128" class="s m" text-anchor="middle">shop.com</text>
+<rect class="acc" x="160" y="87" width="132" height="56" rx="8"/>
+<text x="226" y="110" class="b" text-anchor="middle">Ingress</text>
+<text x="226" y="128" class="s" text-anchor="middle">domain + path</text>
+<rect class="acc" x="330" y="87" width="132" height="56" rx="8"/>
+<text x="396" y="110" class="b" text-anchor="middle">Service</text>
+<text x="396" y="128" class="s" text-anchor="middle">tên cố định</text>
+<rect class="ghost" x="494" y="8" width="216" height="214" rx="10"/>
+<text x="510" y="28" class="s">Deployment: giữ đủ 3 Pod</text>
+<rect class="ok" x="512" y="40" width="180" height="50" rx="8"/>
+<text x="528" y="61" class="b">Pod</text>
+<text x="528" y="79" class="s">đọc ConfigMap / Secret</text>
+<rect class="ok" x="512" y="98" width="180" height="50" rx="8"/>
+<text x="528" y="119" class="b">Pod</text>
+<text x="528" y="137" class="s">đọc ConfigMap / Secret</text>
+<rect class="ok" x="512" y="156" width="180" height="50" rx="8"/>
+<text x="528" y="177" class="b">Pod</text>
+<text x="528" y="195" class="s">đọc ConfigMap / Secret</text>
+<path class="ln-a" d="M122,115 H156" marker-end="url(#aa4)"/>
+<path class="ln-a" d="M292,115 H326" marker-end="url(#aa4)"/>
+<path class="ln-a" d="M462,115 L508,66" marker-end="url(#aa4)"/>
+<path class="ln-a" d="M462,115 H508" marker-end="url(#aa4)"/>
+<path class="ln-a" d="M462,115 L508,180" marker-end="url(#aa4)"/>
+      </svg>
+      <figcaption>Hình dạng chung của gần như mọi app web trên Kubernetes — Phần 1 đi qua từng mắt xích.</figcaption>
+    </figure>
+
+    <h2>Học cái này mất bao lâu</h2>
+    <p>Mỗi bài ghi hai con số: <strong>đọc</strong> (hiểu khái niệm) và <strong>thực hành</strong> (gõ lại lệnh trên cluster của mình, làm thí nghiệm, đọc output). Phần thực hành mới là chỗ kiến thức “dính” lại, nên đừng bỏ qua.</p>
+    <table>
+      <thead><tr><th>Phần</th><th>Đọc</th><th>Thực hành</th><th>Tổng</th></tr></thead>
+      <tbody>
+        <tr><td>Phần 1 · Cốt lõi (9 bài)</td><td>≈ 3 giờ</td><td>≈ 5,5 giờ</td><td><strong>≈ 8,5 giờ</strong></td></tr>
+        <tr><td>Phần 2 · Tra cứu (6 bài, đọc lướt)</td><td>≈ 0,5 giờ</td><td>khi cần</td><td>≈ 0,5 giờ</td></tr>
+        <tr><td>Ôn lại, làm lại bài 9 không nhìn hướng dẫn</td><td></td><td>≈ 1 giờ</td><td>≈ 1 giờ</td></tr>
+        <tr><td colspan="3"><strong>Tổng</strong></td><td><strong>≈ 10 giờ</strong></td></tr>
+      </tbody>
+    </table>
+    <p>Với mục tiêu <strong>2 giờ mỗi ngày</strong>, lộ trình gợi ý là <strong>5 buổi</strong>:</p>
+    <table>
+      <thead><tr><th>Buổi</th><th>Bài</th><th>Xong buổi này thì…</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>1. Tổng quan · 2. Lab · 3. Pod</td><td>Có cluster trên máy, tạo và soi được một Pod.</td></tr>
+        <tr><td>2</td><td>4. Deployment · 5. Service</td><td>App tự phục hồi, cập nhật không downtime, gọi được bằng tên.</td></tr>
+        <tr><td>3</td><td>6. ConfigMap/Secret · 7. Ingress</td><td>App đọc cấu hình, mở ra ngoài theo domain.</td></tr>
+        <tr><td>4</td><td>8. Debug · bắt đầu 9</td><td>Tự đọc lỗi và sửa được các sự cố hay gặp.</td></tr>
+        <tr><td>5</td><td>Xong 9 · lướt Phần 2 · ôn</td><td>Tự viết cấu hình cho một app mới từ số 0.</td></tr>
+      </tbody>
+    </table>
+    <div class="callout tip"><p>Con số là cho người đã quen Docker và terminal. Lần đầu gặp YAML thì cộng thêm khoảng 30%. Cứ chậm mà chắc — mỗi buổi chỉ đi tiếp khi lệnh đã chạy ra đúng như bài.</p></div>
 
     <h2>Tự kiểm tra</h2>
     <div class="qa-list">
-      <details><summary>“Trạng thái mong muốn” khác gì so với chạy lệnh trực tiếp?</summary><p>Bạn mô tả kết quả cần có thay vì từng bước. Controller tự tìm cách đạt và giữ kết quả đó, kể cả khi có sự cố sau này.</p></details>
-      <details><summary>Thành phần nào lưu toàn bộ trạng thái cluster?</summary><p>etcd. Mọi thành phần khác đọc ghi trạng thái qua kube-apiserver, không chạm thẳng vào etcd.</p></details>
-      <details><summary>Ai thực sự khởi động container trên một node?</summary><p>kubelet nhận chỉ thị, còn container runtime (containerd) kéo image và chạy container.</p></details>
+      <details><summary>“Trạng thái mong muốn” nghĩa là gì, giải thích bằng lời của bạn?</summary><p>Mình mô tả kết quả cần có (ví dụ 3 bản app đang chạy), không mô tả các bước. Kubernetes liên tục so thực tế với mô tả đó và tự sửa chênh lệch.</p></details>
+      <details><summary>Một node bị tắt điện, chuyện gì xảy ra với các Pod trên đó?</summary><p>Các Pod đó mất. Controller thấy số bản đang chạy ít hơn mong muốn nên tạo Pod mới, scheduler xếp chúng lên các node còn sống.</p></details>
+      <details><summary>Ai quyết định Pod chạy ở node nào, ai thực sự khởi động container?</summary><p>Scheduler quyết định node; kubelet trên node đó kéo image và khởi động container.</p></details>
     </div>
   </section>
 
-  <section class="lesson" id="pod-va-vong-doi" data-part="Workload" data-title="Pod và vòng đời của Pod" data-minutes="12" data-updated="2026-11-15" data-done="false" data-summary="Viết Pod manifest, các phase trong vòng đời và liveness/readiness probe.">
-    <p>Pod là đơn vị nhỏ nhất mà Kubernetes triển khai và quản lý. Một Pod bọc một hoặc nhiều container chạy cùng nhau trên một node, dùng chung network namespace và volume. Bài này đi qua cách viết một Pod, các phase trong vòng đời của nó và cách dùng probe để cluster biết container còn khỏe hay không.</p>
+  <section class="lesson" id="chuan-bi-lab" data-part="1 · Cốt lõi" data-title="Chuẩn bị lab: cluster trên laptop" data-minutes="15" data-practice="30" data-updated="2026-11-15" data-done="false" data-summary="Cài kubectl và kind, tạo cluster, đọc output đầu tiên, context và namespace.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><strong>kind</strong> tạo một cluster Kubernetes thật ngay trong Docker trên laptop — xóa đi tạo lại trong một phút.</li>
+        <li>Mọi lệnh kubectl có dạng <code>kubectl &lt;làm gì&gt; &lt;loại object&gt; &lt;tên&gt;</code>.</li>
+        <li><strong>Context</strong> = đang nói chuyện với cluster nào. <strong>Namespace</strong> = đang ở “thư mục” nào trong cluster.</li>
+      </ul>
+    </div>
+    <p>Để học, mình cần một cluster để vọc thoải mái mà không sợ làm hỏng gì. Có vài lựa chọn (minikube, k3d, Docker Desktop), mình chọn <strong>kind</strong> (<em>Kubernetes IN Docker</em>): mỗi node của cluster là một container Docker, nên nhẹ và dọn dẹp sạch sẽ.</p>
+    <div class="callout warning"><p>Các khung terminal trong khóa học là <strong>ví dụ output</strong>. Tên Pod, phiên bản, thời gian trên máy bạn sẽ khác — quan trọng là hình dạng và ý nghĩa các cột.</p></div>
 
-    <div class="callout note"><p>Trong thực tế hầu như không ai tạo Pod trực tiếp. Deployment, StatefulSet hay Job tạo Pod thay bạn và thay Pod mới khi Pod cũ chết. Hiểu Pod là để đọc được những gì các controller đó sinh ra.</p></div>
+    <h2>Bước 1: Cài công cụ</h2>
+    <p>Yêu cầu: Docker đang chạy (Docker Desktop, OrbStack hoặc Colima đều được). Sau đó cài hai công cụ:</p>
+    <div class="term" data-title="zsh"><pre>$ brew install kubectl kind
+==> Downloading ...
+🍺  kubernetes-cli was successfully installed!
+🍺  kind was successfully installed!
 
-    <h2>Pod là gì</h2>
-    <p>Có thể coi Pod như một “máy logic” nhỏ. Các container trong cùng một Pod:</p>
+$ kubectl version --client
+Client Version: v1.34.1
+Kustomize Version: v5.7.1
+
+$ kind version
+kind v0.30.0 go1.24.6 darwin/arm64</pre></div>
     <ul>
-      <li>Có chung một địa chỉ IP và gọi nhau qua <code>localhost</code>.</li>
-      <li>Đọc ghi chung các volume khai báo ở cấp Pod.</li>
-      <li>Luôn được xếp lên cùng một node, khởi động và dừng như một khối.</li>
+      <li><code>kubectl</code> — công cụ làm việc với <em>mọi</em> cluster: local, staging, production. Đây là thứ mình dùng cả ngày.</li>
+      <li><code>kind</code> — chỉ dùng để tạo/xóa cluster local. Lên cloud thì không cần nó nữa.</li>
     </ul>
-    <p>Mô hình này hợp với những tiến trình phải sống sát nhau, ví dụ app chính và một sidecar đẩy log hoặc một proxy mạng đi kèm.</p>
 
-    <h2>Viết Pod manifest</h2>
-    <p>Pod tối giản dưới đây chạy một container nginx, kèm label để Service tìm thấy sau này và resource request để scheduler biết cần chỗ bao nhiêu.</p>
-<pre data-file="web-pod.yaml"><code class="language-yaml">apiVersion: v1
-kind: Pod
-metadata:
-  name: web
-  labels:
-    app: web
-spec:
-  containers:
-    - name: nginx
-      image: nginx:1.27
-      ports:
-        - containerPort: 80
-      resources:
-        requests:
-          cpu: "100m"
-          memory: "128Mi"</code></pre>
-    <p>Áp dụng manifest và theo dõi Pod:</p>
-<pre><code class="language-bash">kubectl apply -f web-pod.yaml
-kubectl get pod web -o wide      # node và IP của Pod
-kubectl describe pod web         # event: kéo image, lên lịch, probe
-kubectl logs web -f              # log của container</code></pre>
+    <h2>Bước 2: Tạo cluster</h2>
+    <div class="term" data-title="zsh"><pre>$ kind create cluster --name lab
+Creating cluster "lab" ...
+ ✓ Ensuring node image (kindest/node:v1.34.0) 🖼
+ ✓ Preparing nodes 📦
+ ✓ Writing configuration 📜
+ ✓ Starting control-plane 🕹️
+ ✓ Installing CNI 🔌
+ ✓ Installing StorageClass 💾
+Set kubectl context to "kind-lab"
+You can now use your cluster with:
 
-    <h2>Vòng đời và các phase</h2>
-    <p>Trường <code>status.phase</code> tóm tắt Pod đang ở đâu trong vòng đời. Chỉ có năm giá trị:</p>
-    <table>
-      <thead><tr><th style="width:130px">Phase</th><th>Ý nghĩa</th></tr></thead>
-      <tbody>
-        <tr><td><code>Pending</code></td><td>Cluster đã nhận Pod nhưng chưa container nào chạy: đang chờ lên lịch hoặc đang kéo image.</td></tr>
-        <tr><td><code>Running</code></td><td>Pod đã gắn vào node, ít nhất một container đang chạy, khởi động hoặc khởi động lại.</td></tr>
-        <tr><td><code>Succeeded</code></td><td>Mọi container đã kết thúc thành công và sẽ không khởi động lại.</td></tr>
-        <tr><td><code>Failed</code></td><td>Mọi container đã dừng, ít nhất một container thoát với lỗi.</td></tr>
-        <tr><td><code>Unknown</code></td><td>Không lấy được trạng thái, thường do mất liên lạc với node.</td></tr>
-      </tbody>
-    </table>
-    <div class="callout warning"><p><code>CrashLoopBackOff</code> không phải là phase. Đó là lý do một container đang phải chờ trước lần khởi động lại tiếp theo sau nhiều lần crash. Pod lúc đó thường vẫn ở phase <code>Running</code>.</p></div>
+kubectl cluster-info --context kind-lab</pre></div>
+    <p>Lần đầu sẽ mất một hai phút để tải image node. Để ý dòng <code>Set kubectl context to "kind-lab"</code>: kind đã tự cấu hình để kubectl nói chuyện với cluster mới này.</p>
 
-    <h2>Liveness, readiness và startup probe</h2>
-    <p>kubelet dùng probe để hỏi container định kỳ. Mỗi loại dẫn tới một hành động khác nhau khi thất bại:</p>
+    <h2>Bước 3: Nhìn cluster vừa tạo</h2>
+    <div class="term" data-title="zsh"><pre>$ kubectl get nodes
+NAME                STATUS   ROLES           AGE   VERSION
+lab-control-plane   Ready    control-plane   48s   v1.34.0</pre></div>
+    <p>Đọc output:</p>
     <ul>
-      <li><strong>Liveness</strong> — thất bại thì kubelet khởi động lại container.</li>
-      <li><strong>Readiness</strong> — thất bại thì Pod bị gỡ khỏi endpoint của Service, không bị khởi động lại.</li>
-      <li><strong>Startup</strong> — tạm hoãn hai probe trên cho tới khi app khởi động xong.</li>
+      <li><code>NAME</code> — tên node. Cluster này có đúng một node.</li>
+      <li><code>STATUS: Ready</code> — node khỏe, sẵn sàng nhận Pod. Nếu thấy <code>NotReady</code> thì chờ thêm vài giây.</li>
+      <li><code>ROLES: control-plane</code> — node này chạy bộ não. Với cluster một node, nó kiêm luôn việc chạy app của mình.</li>
     </ul>
-<pre data-file="thêm vào container nginx"><code class="language-yaml">readinessProbe:
-  httpGet:
-    path: /
-    port: 80
-  periodSeconds: 5
-livenessProbe:
-  httpGet:
-    path: /
-    port: 80
-  initialDelaySeconds: 10
-  failureThreshold: 3</code></pre>
-    <div class="callout tip"><p>Đừng trỏ liveness probe vào endpoint có gọi database. Database chậm một chút là các Pod bị restart dây chuyền. Liveness chỉ nên trả lời câu hỏi “tiến trình còn sống không”.</p></div>
+    <p>Muốn chắc “node là một container”? Hỏi Docker:</p>
+    <div class="term" data-title="zsh"><pre>$ docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
+NAMES               IMAGE                  STATUS
+lab-control-plane   kindest/node:v1.34.0   Up 2 minutes</pre></div>
+    <p>Còn bên trong cluster đang chạy gì? Lệnh dưới liệt kê Pod ở mọi namespace (<code>-A</code>):</p>
+    <div class="term" data-title="zsh"><pre>$ kubectl get pods -A
+NAMESPACE            NAME                                        READY   STATUS    RESTARTS   AGE
+kube-system          coredns-66bc5c9577-8xk2p                    1/1     Running   0          2m
+kube-system          coredns-66bc5c9577-qv7tn                    1/1     Running   0          2m
+kube-system          etcd-lab-control-plane                      1/1     Running   0          2m
+kube-system          kindnet-zt9vl                               1/1     Running   0          2m
+kube-system          kube-apiserver-lab-control-plane            1/1     Running   0          2m
+kube-system          kube-controller-manager-lab-control-plane   1/1     Running   0          2m
+kube-system          kube-proxy-5hq8r                            1/1     Running   0          2m
+kube-system          kube-scheduler-lab-control-plane            1/1     Running   0          2m
+local-path-storage   local-path-provisioner-7b8c8ddbd6-4nwfg     1/1     Running   0          2m</pre></div>
+    <p>Đây chính là các thành phần ở bài 1, giờ nhìn thấy tận mắt: <code>kube-apiserver</code>, <code>etcd</code>, <code>kube-scheduler</code>, <code>kube-controller-manager</code> là bộ não; <code>coredns</code> lo DNS nội bộ (bài 5 dùng tới); <code>kindnet</code> lo mạng giữa các Pod. Mình không đụng vào chúng — chỉ cần biết chúng ở đó.</p>
+
+    <h2>Cấu trúc một lệnh kubectl</h2>
+    <p>Gần như mọi lệnh đều theo một khuôn:</p>
+<pre><code class="language-text">kubectl   get       pods      hello     -n demo     -o wide
+          ───       ────      ─────     ───────     ───────
+          làm gì    loại      tên       namespace   định dạng output
+                    object    (tùy)     (tùy)       (tùy)</code></pre>
+    <p>Nắm khuôn này rồi thì đổi từng phần là ra lệnh mới: <code>get</code> → <code>describe</code>, <code>delete</code>; <code>pods</code> → <code>deployments</code>, <code>services</code>… Các loại object còn có tên viết tắt: <code>po</code>, <code>deploy</code>, <code>svc</code>, <code>ns</code>, <code>cm</code>.</p>
+
+    <h2>Namespace: chia cluster thành nhiều “thư mục”</h2>
+    <p>Namespace giống thư mục: cùng một tên object có thể tồn tại ở hai namespace khác nhau mà không đụng nhau. Công ty thường chia namespace theo team hoặc môi trường (<code>shop-dev</code>, <code>shop-prod</code>). Không ghi <code>-n</code> thì kubectl dùng namespace <code>default</code>.</p>
+    <div class="term" data-title="zsh"><pre>$ kubectl get namespaces
+NAME                 STATUS   AGE
+default              Active   5m
+kube-node-lease      Active   5m
+kube-public          Active   5m
+kube-system          Active   5m
+local-path-storage   Active   5m
+
+$ kubectl create namespace demo
+namespace/demo created
+
+$ kubectl get pods -n demo
+No resources found in demo namespace.</pre></div>
+    <p>Cả khóa học mình làm trong namespace <code>demo</code>. Để khỏi phải gõ <code>-n demo</code> mỗi lần, đặt nó làm mặc định:</p>
+    <div class="term" data-title="zsh"><pre>$ kubectl config set-context --current --namespace=demo
+Context "kind-lab" modified.</pre></div>
+
+    <h2>Context: đang nói chuyện với cluster nào</h2>
+    <p>kubectl lưu danh sách cluster trong file <code>~/.kube/config</code>. Mỗi mục gọi là một <strong>context</strong>. Đi làm, máy mình sẽ có nhiều context (local, staging, production) — nên luôn biết mình đang ở đâu.</p>
+    <div class="term" data-title="zsh"><pre>$ kubectl config get-contexts
+CURRENT   NAME       CLUSTER    AUTHINFO   NAMESPACE
+*         kind-lab   kind-lab   kind-lab   demo
+
+$ kubectl config current-context
+kind-lab</pre></div>
+    <p>Dấu <code>*</code> đánh dấu context đang dùng. Chuyển context: <code>kubectl config use-context &lt;tên&gt;</code>.</p>
+    <div class="callout warning"><p>Lỗi kinh điển: tưởng đang ở cluster local, gõ lệnh xóa — nhưng thực ra context đang là production. Trước mọi lệnh <code>delete</code> hay <code>apply</code> quan trọng, chạy <code>kubectl config current-context</code>.</p></div>
+
+    <h2>Tiện ích nên cài thêm</h2>
+    <ul>
+      <li><code>alias k=kubectl</code> trong <code>~/.zshrc</code> — gõ <code>k get pods</code> cho nhanh.</li>
+      <li><strong>k9s</strong> (<code>brew install k9s</code>) — giao diện trong terminal để duyệt Pod, xem log, vào shell bằng phím tắt. Rất hợp lúc mới học vì nhìn thấy mọi thứ thay đổi theo thời gian thực.</li>
+    </ul>
+
+    <h2>Dọn dẹp và làm lại</h2>
+    <p>Vọc hỏng thì xóa cluster, tạo lại cái mới — đây là ưu điểm lớn nhất của kind:</p>
+    <div class="term" data-title="zsh"><pre>$ kind delete cluster --name lab
+Deleting cluster "lab" ...
+Deleted nodes: ["lab-control-plane"]</pre></div>
 
     <h2>Tự kiểm tra</h2>
-    <p>Nghĩ câu trả lời trước rồi mở ra xem.</p>
     <div class="qa-list">
-      <details><summary>Hai container trong cùng Pod gọi nhau bằng địa chỉ nào?</summary><p>localhost — chúng dùng chung network namespace nên chung IP và dải port. Hai container không được mở trùng port.</p></details>
-      <details><summary>Pod đang báo CrashLoopBackOff thì phase của nó là gì?</summary><p>Thường vẫn là Running. CrashLoopBackOff là lý do chờ của container, không phải phase của Pod.</p></details>
-      <details><summary>App cần 60 giây để nạp cache khi khởi động. Dùng probe nào để không bị restart oan?</summary><p>startupProbe. Khi nó chưa thành công, liveness và readiness chưa chạy.</p></details>
+      <details><summary>Lệnh để xem các Service trong namespace kube-system?</summary><p>kubectl get services -n kube-system (hoặc viết tắt: kubectl get svc -n kube-system).</p></details>
+      <details><summary>Context và namespace khác nhau thế nào?</summary><p>Context chọn cluster (và user) mà kubectl kết nối tới; namespace chọn vùng bên trong cluster đó.</p></details>
+      <details><summary>Một node của kind thực chất là gì?</summary><p>Một container Docker, bên trong chạy kubelet và container runtime, đóng vai một máy của cluster.</p></details>
+    </div>
+  </section>
+
+  <section class="lesson" id="pod" data-part="1 · Cốt lõi" data-title="Pod: nơi container thực sự chạy" data-minutes="18" data-practice="40" data-updated="2026-11-15" data-done="false" data-summary="Pod là gì, tạo Pod, đọc get/describe/logs, vào bên trong, viết YAML từng dòng — và vì sao không dùng Pod trực tiếp.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><strong>Pod</strong> là “cái vỏ” bọc container. Kubernetes không chạy container trần — nó luôn chạy Pod.</li>
+        <li>Mỗi Pod có <strong>IP riêng</strong>, chạy trên <strong>một node</strong>. Thường mỗi Pod chỉ có một container.</li>
+        <li>Pod là thứ <strong>dùng một lần</strong>: chết là mất, không tự sống lại. Vì vậy thực tế không ai tạo Pod trực tiếp.</li>
+        <li>4 lệnh xem Pod: <code>get</code>, <code>describe</code>, <code>logs</code>, <code>exec</code>.</li>
+      </ul>
     </div>
 
-    <p style="margin-top:28px;font-size:14px;color:var(--muted)">Tài liệu gốc: <a href="https://kubernetes.io/docs/concepts/workloads/pods/">Pods</a> · <a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/">Pod Lifecycle</a> — kubernetes.io</p>
+    <h2>Pod là gì</h2>
+    <p>Trong Docker, đơn vị nhỏ nhất là container. Trong Kubernetes, đơn vị nhỏ nhất là <strong>Pod</strong>. Có thể hình dung Pod như <strong>một căn phòng</strong>, container là người ở trong phòng:</p>
+    <ul>
+      <li>Cả phòng có chung <strong>một địa chỉ</strong> (một IP). Người trong phòng nói chuyện với nhau qua <code>localhost</code>.</li>
+      <li>Cả phòng có chung <strong>tủ đồ</strong> (volume) — các container trong Pod đọc ghi được cùng thư mục.</li>
+      <li>Cả phòng <strong>dọn đi cùng lúc</strong> — Kubernetes xếp, khởi động, dừng cả Pod như một khối, luôn trên cùng một node.</li>
+    </ul>
+    <p>Hầu hết các Pod chỉ có <strong>một container</strong> — app của mình. Pod nhiều container dành cho trường hợp đặc biệt, ví dụ app chính kèm một container phụ đẩy log ra ngoài (gọi là <em>sidecar</em>). Lúc mới học, cứ nghĩ <strong>1 Pod = 1 container + IP riêng</strong> là đủ.</p>
+    <figure class="diagram">
+      <svg class="dg" viewBox="0 0 720 200" role="img" aria-label="Cấu trúc một Pod chứa container"><defs><marker id="ah5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="aa5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="zone" x="8" y="8" width="704" height="184" rx="12"/>
+<text x="24" y="30" class="s">Node: lab-control-plane</text>
+<rect class="acc" x="28" y="42" width="436" height="136" rx="10"/>
+<text x="44" y="64" class="b">Pod “hello”</text>
+<text x="44" y="82" class="s m">IP 10.244.0.5</text>
+<rect class="box" x="44" y="96" width="190" height="66" rx="8"/>
+<text x="58" y="121" class="b">container: podinfo</text>
+<text x="58" y="140" class="s">lắng nghe cổng 9898</text>
+<rect class="ghost" x="254" y="96" width="194" height="66" rx="8"/>
+<text x="268" y="121" class="b">container phụ</text>
+<text x="268" y="140" class="s">tùy chọn, vd: đẩy log</text>
+<text x="490" y="70">• chung một địa chỉ IP</text>
+<text x="490" y="94">• gọi nhau qua localhost</text>
+<text x="490" y="118">• dùng chung volume</text>
+<text x="490" y="142">• luôn ở cùng một node,</text>
+<text x="490" y="166">  chạy và dừng cùng nhau</text>
+      </svg>
+      <figcaption>Pod như một căn phòng: container bên trong dùng chung địa chỉ và tủ đồ. Hầu hết Pod chỉ có một container.</figcaption>
+    </figure>
+
+    <h2>App ví dụ của khóa học: podinfo</h2>
+    <p>Suốt Phần 1 mình dùng <strong>podinfo</strong> — một web app nhỏ viết cho việc học Kubernetes. Gọi vào nó trả về JSON có <code>hostname</code> (chính là tên Pod), phiên bản và một câu <code>message</code>. Nhờ vậy mình nhìn thấy được request rơi vào Pod nào, và cấu hình có được nạp đúng không.</p>
+
+    <h2>Tạo Pod đầu tiên bằng một lệnh</h2>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl run hello --image=ghcr.io/stefanprodan/podinfo:6.7.0
+pod/hello created</pre></div>
+    <p><code>kubectl run</code> tạo một Pod tên <code>hello</code> từ image đã cho. Theo dõi nó khởi động — cờ <code>-w</code> (<em>watch</em>) giữ lệnh chạy và in thêm dòng mỗi khi trạng thái đổi (Ctrl+C để thoát):</p>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl get pods -w
+NAME    READY   STATUS              RESTARTS   AGE
+hello   0/1     ContainerCreating   0          2s
+hello   1/1     Running             0          9s</pre></div>
+    <p>Đọc từng cột — đây là output mình sẽ nhìn nhiều nhất khi làm Kubernetes:</p>
+    <table>
+      <thead><tr><th>Cột</th><th>Ý nghĩa</th></tr></thead>
+      <tbody>
+        <tr><td><code>READY 1/1</code></td><td>Số container sẵn sàng / tổng số container trong Pod. <code>0/1</code> là chưa sẵn sàng.</td></tr>
+        <tr><td><code>STATUS</code></td><td><code>ContainerCreating</code> (đang kéo image, khởi động) → <code>Running</code>. Các trạng thái lỗi xem ở bài Debug.</td></tr>
+        <tr><td><code>RESTARTS</code></td><td>Container đã bị khởi động lại bao nhiêu lần. Số này tăng dần là dấu hiệu app đang crash.</td></tr>
+        <tr><td><code>AGE</code></td><td>Pod được tạo bao lâu rồi.</td></tr>
+      </tbody>
+    </table>
+    <p>Thêm <code>-o wide</code> để xem IP và node:</p>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl get pods -o wide
+NAME    READY   STATUS    RESTARTS   AGE   IP           NODE                NOMINATED NODE   READINESS GATES
+hello   1/1     Running   0          40s   10.244.0.5   lab-control-plane   &lt;none&gt;           &lt;none&gt;</pre></div>
+
+    <h2>describe: xem mọi thứ về Pod</h2>
+    <p><code>describe</code> in ra chi tiết, và quan trọng nhất là phần <strong>Events</strong> ở cuối — nhật ký những gì Kubernetes đã làm với Pod này:</p>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl describe pod hello
+Name:             hello
+Namespace:        demo
+Node:             lab-control-plane/172.18.0.2
+Labels:           run=hello
+Status:           Running
+IP:               10.244.0.5
+Containers:
+  hello:
+    Image:          ghcr.io/stefanprodan/podinfo:6.7.0
+    State:          Running
+      Started:      Sun, 15 Nov 2026 16:02:11 +0700
+    Ready:          True
+    Restart Count:  0
+...
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  <span class="hl">Scheduled</span>  60s   default-scheduler  Successfully assigned demo/hello to lab-control-plane
+  Normal  <span class="hl">Pulling</span>    59s   kubelet            Pulling image "ghcr.io/stefanprodan/podinfo:6.7.0"
+  Normal  <span class="hl">Pulled</span>     53s   kubelet            Successfully pulled image ... in 6.1s
+  Normal  <span class="hl">Created</span>    53s   kubelet            Created container: hello
+  Normal  <span class="hl">Started</span>    52s   kubelet            Started container hello</pre></div>
+    <p>Đọc Events từ trên xuống là thấy lại đúng luồng ở bài 1: <strong>scheduler</strong> chọn node (<code>Scheduled</code>) → <strong>kubelet</strong> trên node kéo image (<code>Pulling</code>, <code>Pulled</code>) → tạo và chạy container (<code>Created</code>, <code>Started</code>). Khi có lỗi, dòng lỗi sẽ xuất hiện ở đây — nên <code>describe</code> luôn là lệnh đầu tiên khi điều tra.</p>
+
+    <h2>logs: xem app in ra gì</h2>
+    <p>Mọi thứ app in ra stdout/stderr đều xem được bằng <code>logs</code> (thêm <code>-f</code> để theo dõi liên tục như <code>tail -f</code>):</p>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl logs hello
+{"level":"info","ts":"2026-11-15T09:02:11.402Z","caller":"podinfo/main.go:153","msg":"Starting podinfo","version":"6.7.0"}
+{"level":"info","ts":"2026-11-15T09:02:11.405Z","caller":"api/server.go:274","msg":"Starting HTTP Server.","addr":":9898"}</pre></div>
+    <p>Dòng thứ hai cho biết app lắng nghe cổng <strong>9898</strong> — thông tin này lát nữa cần dùng.</p>
+
+    <h2>port-forward: gọi thử app từ máy mình</h2>
+    <p>Pod có IP <code>10.244.0.5</code>, nhưng IP đó chỉ tồn tại <em>bên trong</em> cluster — trình duyệt trên máy mình không gọi tới được. <code>port-forward</code> mở một đường ống từ cổng trên máy mình vào Pod. Mở <strong>terminal thứ hai</strong> (lệnh này chạy liên tục):</p>
+    <div class="term" data-title="terminal 2"><pre>$ kubectl port-forward pod/hello 8080:9898
+Forwarding from 127.0.0.1:8080 -> 9898
+Forwarding from [::1]:8080 -> 9898</pre></div>
+    <p><code>8080:9898</code> nghĩa là <em>cổng 8080 trên máy mình</em> → <em>cổng 9898 của Pod</em>. Quay lại terminal đầu:</p>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ curl localhost:8080
+{
+  "hostname": "<span class="hl">hello</span>",
+  "version": "6.7.0",
+  "message": "greetings from podinfo v6.7.0",
+  "goos": "linux",
+  ...
+}</pre></div>
+    <p><code>"hostname": "hello"</code> — trong Kubernetes, hostname của container chính là tên Pod. Chi tiết nhỏ này sẽ rất hữu ích ở bài Service.</p>
+
+    <h2>exec: vào bên trong container</h2>
+    <p>Giống <code>docker exec</code>. Dùng khi cần kiểm tra file, biến môi trường, hay gọi thử mạng từ bên trong:</p>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl exec -it hello -- sh
+~ $ hostname
+hello
+~ $ wget -qO- localhost:9898/version
+{"commit":"…","version":"6.7.0"}
+~ $ exit</pre></div>
+    <p>Dấu <code>--</code> ngăn cách phần của kubectl với lệnh sẽ chạy trong container. <code>-it</code> để có shell tương tác.</p>
+
+    <h2>Viết Pod bằng YAML, từng dòng một</h2>
+    <p><code>kubectl run</code> tiện để thử, nhưng công việc thật luôn dùng <strong>file YAML</strong>: lưu được vào Git, review được, chạy lại bao nhiêu lần cũng ra cùng kết quả. Mình viết lại Pod <code>hello</code> từ đầu.</p>
+
+    <h3>Bước 1 — Đây là cái gì?</h3>
+    <p>Mọi object đều mở đầu bằng hai dòng cho Kubernetes biết loại object:</p>
+<pre data-file="hello-pod.yaml" data-add="1-2"><code class="language-yaml">apiVersion: v1
+kind: Pod</code></pre>
+    <ul>
+      <li><code>kind</code> — loại object: <code>Pod</code>, <code>Deployment</code>, <code>Service</code>…</li>
+      <li><code>apiVersion</code> — nhóm API chứa loại đó. Pod, Service, ConfigMap là <code>v1</code>; Deployment là <code>apps/v1</code>. Không cần thuộc: <code>kubectl explain pod</code> in ra đúng giá trị.</li>
+    </ul>
+
+    <h3>Bước 2 — Tên và nhãn</h3>
+<pre data-file="hello-pod.yaml" data-add="3-6"><code class="language-yaml">apiVersion: v1
+kind: Pod
+metadata:
+  name: hello-yaml
+  labels:
+    app: hello</code></pre>
+    <ul>
+      <li><code>metadata</code> — thông tin nhận diện object.</li>
+      <li><code>name</code> — tên, phải duy nhất trong namespace.</li>
+      <li><code>labels</code> — <strong>nhãn</strong> dạng key: value tự đặt. Nhìn thì vô hại, nhưng nhãn là cách các object tìm thấy nhau (Deployment tìm Pod, Service tìm Pod). Bài 4 và 5 sẽ thấy rõ.</li>
+    </ul>
+
+    <h3>Bước 3 — Bên trong chạy gì?</h3>
+<pre data-file="hello-pod.yaml" data-add="7-12"><code class="language-yaml">apiVersion: v1
+kind: Pod
+metadata:
+  name: hello-yaml
+  labels:
+    app: hello
+spec:
+  containers:
+    - name: podinfo
+      image: ghcr.io/stefanprodan/podinfo:6.7.0
+      ports:
+        - containerPort: 9898</code></pre>
+    <ul>
+      <li><code>spec</code> — <strong>trạng thái mong muốn</strong>. Đây là phần mình mô tả “tôi muốn gì”.</li>
+      <li><code>containers</code> — danh sách container (dấu <code>-</code> là một phần tử của danh sách YAML). Ở đây có một.</li>
+      <li><code>name</code>, <code>image</code> — tên container và image chạy, giống <code>docker run</code>.</li>
+      <li><code>containerPort</code> — cổng app lắng nghe (9898, đã thấy trong log). Dòng này chủ yếu mang tính ghi chú; app vẫn lắng nghe dù không khai.</li>
+    </ul>
+    <p>Bốn khối <code>apiVersion</code>, <code>kind</code>, <code>metadata</code>, <code>spec</code> có ở <strong>mọi</strong> object Kubernetes. Nhìn quen bốn khối này là đọc được mọi file YAML.</p>
+
+    <h3>Bước 4 — Apply</h3>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl apply -f hello-pod.yaml
+pod/hello-yaml created
+
+$ kubectl get pods --show-labels
+NAME         READY   STATUS    RESTARTS   AGE   LABELS
+hello        1/1     Running   0          8m    run=hello
+hello-yaml   1/1     Running   0          6s    app=hello
+
+$ kubectl apply -f hello-pod.yaml
+pod/hello-yaml unchanged</pre></div>
+    <p>Chạy <code>apply</code> lần hai báo <code>unchanged</code>: Kubernetes so file với trạng thái hiện tại, thấy giống nhau nên không làm gì. Đây là cái hay của cách khai báo — file là nguồn sự thật, chạy lại thoải mái.</p>
+    <div class="callout tip" data-title="Mẹo: không cần tự gõ YAML từ đầu"><p>Để kubectl sinh khung rồi sửa tiếp: <code>kubectl run hello --image=... --dry-run=client -o yaml &gt; hello-pod.yaml</code>. <code>--dry-run=client</code> nghĩa là “đừng tạo thật, chỉ in ra”.</p></div>
+
+    <h2>Thí nghiệm: xóa Pod thì sao?</h2>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl delete pod hello
+pod "hello" deleted
+
+$ kubectl get pods
+NAME         READY   STATUS    RESTARTS   AGE
+hello-yaml   1/1     Running   0          2m</pre></div>
+    <p>Pod <code>hello</code> biến mất và <strong>không quay lại</strong>. Không có gì canh giữ nó. Nếu node chết, Pod trên đó cũng mất luôn như vậy. Thêm nữa, mỗi lần tạo lại, Pod có <strong>IP mới</strong>.</p>
+    <div class="callout warning" data-title="Kết luận của bài"><p>Pod tự nó không có “trạng thái mong muốn” nào được canh giữ — nó chỉ là một lần chạy. Đây là lý do thực tế mình <strong>không bao giờ tạo Pod trực tiếp</strong>, mà tạo <strong>Deployment</strong> để nó tạo Pod và tự thay Pod mới khi Pod cũ chết. Đó là bài tiếp theo.</p></div>
+    <p>Dọn dẹp trước khi sang bài sau: <code>kubectl delete pod hello-yaml</code>.</p>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Hai container trong cùng một Pod gọi nhau bằng địa chỉ nào?</summary><p>localhost — chúng dùng chung một địa chỉ IP (chung network). Vì vậy hai container trong cùng Pod không được mở trùng cổng.</p></details>
+      <details><summary>Pod báo READY 0/1, STATUS Running nghĩa là gì?</summary><p>Container đang chạy nhưng chưa được coi là sẵn sàng (ví dụ app chưa khởi động xong hoặc kiểm tra sẵn sàng chưa qua).</p></details>
+      <details><summary>Bốn khối có trong mọi file YAML của Kubernetes là gì?</summary><p>apiVersion, kind, metadata, spec.</p></details>
+      <details><summary>Vì sao IP của Pod không thể dùng làm địa chỉ cố định để app khác gọi tới?</summary><p>Vì Pod có thể bị xóa và tạo lại bất cứ lúc nào, mỗi lần lại có IP mới.</p></details>
+    </div>
+  </section>
+
+  <section class="lesson" id="deployment" data-part="1 · Cốt lõi" data-title="Deployment: giữ app luôn chạy và cập nhật không downtime" data-minutes="22" data-practice="50" data-updated="2026-11-15" data-done="false" data-summary="Viết Deployment từ Pod, xem nó tự phục hồi, scale, cập nhật phiên bản và rollback.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><strong>Deployment</strong> = “luôn giữ N bản Pod chạy image X”. Pod chết thì nó tạo Pod mới.</li>
+        <li>Phần <code>template</code> của Deployment chính là một Pod — mình đã biết viết.</li>
+        <li><code>selector</code> + <code>labels</code> là sợi dây để Deployment nhận ra Pod nào là của nó.</li>
+        <li>Đổi image → Deployment thay Pod <strong>dần dần</strong>, không downtime. Lỗi → <code>kubectl rollout undo</code>.</li>
+      </ul>
+    </div>
+
+    <h2>Deployment làm gì</h2>
+    <p>Bài trước kết thúc ở chỗ: Pod chết là mất. Deployment giải quyết đúng chuyện đó. Mình nói với nó: <em>“luôn có 3 Pod chạy podinfo:6.7.0”</em>, và nó:</p>
+    <ul>
+      <li>tạo đủ 3 Pod;</li>
+      <li>canh liên tục — Pod nào chết, node nào chết, nó tạo Pod mới thay;</li>
+      <li>khi mình đổi sang 6.7.1, nó thay dần từng Pod cũ bằng Pod mới để app không bị gián đoạn;</li>
+      <li>nhớ các phiên bản trước để quay lại khi cần.</li>
+    </ul>
+    <p>Bên dưới, Deployment không tự tạo Pod mà nhờ một object trung gian tên <strong>ReplicaSet</strong>:</p>
+    <figure class="diagram">
+      <svg class="dg" viewBox="0 0 720 236" role="img" aria-label="Deployment quản lý ReplicaSet, ReplicaSet tạo Pod"><defs><marker id="ah6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="aa6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="acc" x="250" y="10" width="220" height="52" rx="8"/>
+<text x="360" y="32" class="b" text-anchor="middle">Deployment “web”</text>
+<text x="360" y="50" class="s" text-anchor="middle">mình viết và làm việc với nó</text>
+<rect class="box" x="250" y="96" width="220" height="52" rx="8"/>
+<text x="360" y="118" class="b m" text-anchor="middle">ReplicaSet web-7d9c6b8f5</text>
+<text x="360" y="136" class="s" text-anchor="middle">giữ đủ số Pod</text>
+<rect class="ok" x="40" y="182" width="200" height="46" rx="8"/>
+<text x="140" y="203" class="m" text-anchor="middle">web-7d9c6b8f5-2xkqp</text>
+<text x="140" y="220" class="s" text-anchor="middle">Pod</text>
+<rect class="ok" x="260" y="182" width="200" height="46" rx="8"/>
+<text x="360" y="203" class="m" text-anchor="middle">web-7d9c6b8f5-h8m4z</text>
+<text x="360" y="220" class="s" text-anchor="middle">Pod</text>
+<rect class="ok" x="480" y="182" width="200" height="46" rx="8"/>
+<text x="580" y="203" class="m" text-anchor="middle">web-7d9c6b8f5-tq9wd</text>
+<text x="580" y="220" class="s" text-anchor="middle">Pod</text>
+<path class="ln" d="M360,62 V92" marker-end="url(#ah6)"/>
+<path class="ln" d="M360,148 L142,178" marker-end="url(#ah6)"/>
+<path class="ln" d="M360,148 V178" marker-end="url(#ah6)"/>
+<path class="ln" d="M360,148 L578,178" marker-end="url(#ah6)"/>
+<text x="486" y="34" class="s">mỗi phiên bản template</text>
+<text x="486" y="50" class="s">→ một ReplicaSet</text>
+      </svg>
+      <figcaption>Tên Pod = tên Deployment + mã ReplicaSet + chuỗi ngẫu nhiên.</figcaption>
+    </figure>
+    <p>Mình gần như không bao giờ đụng vào ReplicaSet — chỉ cần biết nó tồn tại để đọc hiểu output.</p>
+
+    <h2>Viết Deployment, từng bước</h2>
+    <p>Mình bắt đầu từ chính Pod ở bài trước và “bọc” nó lại.</p>
+
+    <h3>Bước 1 — Phần đầu</h3>
+<pre data-file="web.yaml" data-add="1-4"><code class="language-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web</code></pre>
+    <p>Deployment nằm trong nhóm API <code>apps</code>, nên <code>apiVersion: apps/v1</code> (khác Pod là <code>v1</code>).</p>
+
+    <h3>Bước 2 — Cần bao nhiêu bản</h3>
+<pre data-file="web.yaml" data-add="5-6"><code class="language-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 3</code></pre>
+
+    <h3>Bước 3 — Khuôn để tạo Pod</h3>
+    <p><code>template</code> là bản mẫu Deployment dùng mỗi khi cần tạo Pod. Nhìn kỹ: phần được tô chính là <code>metadata</code> và <code>spec</code> của Pod ở bài 3, chỉ thụt vào trong:</p>
+<pre data-file="web.yaml" data-add="7-16"><code class="language-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: podinfo
+          image: ghcr.io/stefanprodan/podinfo:6.7.0
+          ports:
+            - containerPort: 9898</code></pre>
+    <p>Không cần đặt <code>name</code> cho Pod trong template — Deployment tự đặt tên cho từng Pod nó tạo.</p>
+
+    <h3>Bước 4 — Selector: Pod nào là của tôi?</h3>
+    <p>Deployment cần biết những Pod nào thuộc về nó để đếm (“đang có mấy bản?”). Nó không nhớ tên Pod — nó tìm theo <strong>nhãn</strong>:</p>
+<pre data-file="web.yaml" data-add="7-9"><code class="language-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: podinfo
+          image: ghcr.io/stefanprodan/podinfo:6.7.0
+          ports:
+            - containerPort: 9898</code></pre>
+    <p>Đọc thành câu: <em>“Deployment web quản lý mọi Pod có nhãn <code>app: web</code>, và khi tạo Pod mới thì gắn nhãn <code>app: web</code> cho nó.”</em> Hai chỗ <code>app: web</code> phải khớp nhau, nếu không kubectl sẽ báo lỗi ngay khi apply.</p>
+    <div class="callout tip" data-title="Mình ghi nhớ thế này"><p>Mình thấy cặp selector/labels là thứ dễ quên nhất, nên tự nhủ: <strong>label là bảng tên đeo trên Pod, selector là tờ danh sách “tìm người đeo bảng tên này”</strong>. Service ở bài sau cũng dùng đúng cơ chế đó.</p></div>
+
+    <h2>Apply và đọc output</h2>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl apply -f web.yaml
+deployment.apps/web created
+
+$ kubectl get deployment web
+NAME   READY   UP-TO-DATE   AVAILABLE   AGE
+web    3/3     3            3           20s</pre></div>
+    <table>
+      <thead><tr><th>Cột</th><th>Ý nghĩa</th></tr></thead>
+      <tbody>
+        <tr><td><code>READY 3/3</code></td><td>3 Pod sẵn sàng trên 3 mong muốn.</td></tr>
+        <tr><td><code>UP-TO-DATE</code></td><td>Số Pod đang chạy đúng phiên bản template mới nhất (quan trọng lúc cập nhật).</td></tr>
+        <tr><td><code>AVAILABLE</code></td><td>Số Pod đang phục vụ được.</td></tr>
+      </tbody>
+    </table>
+    <p>Nhìn cả chuỗi Deployment → ReplicaSet → Pod (<code>-l app=web</code> lọc theo nhãn):</p>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl get deploy,rs,pods -l app=web
+NAME                  READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/web   3/3     3            3           45s
+
+NAME                             DESIRED   CURRENT   READY   AGE
+replicaset.apps/web-<span class="hl">7d9c6b8f5</span>   3         3         3       45s
+
+NAME                       READY   STATUS    RESTARTS   AGE
+pod/web-<span class="hl">7d9c6b8f5</span>-2xkqp   1/1     Running   0          45s
+pod/web-<span class="hl">7d9c6b8f5</span>-h8m4z   1/1     Running   0          45s
+pod/web-<span class="hl">7d9c6b8f5</span>-tq9wd   1/1     Running   0          45s</pre></div>
+    <p>Tên Pod có dạng <code>&lt;deployment&gt;-&lt;mã ReplicaSet&gt;-&lt;ngẫu nhiên&gt;</code>. Đoạn mã ở giữa thay đổi mỗi khi template thay đổi — nhìn vào là biết Pod thuộc phiên bản nào.</p>
+
+    <h2>Thí nghiệm 1: xóa Pod</h2>
+    <p>Mở terminal thứ hai chạy <code>kubectl get pods -w</code>, rồi ở terminal đầu xóa một Pod:</p>
+    <div class="term" data-title="terminal 1"><pre>$ kubectl delete pod web-7d9c6b8f5-2xkqp
+pod "web-7d9c6b8f5-2xkqp" deleted</pre></div>
+    <div class="term" data-title="terminal 2 — kubectl get pods -w"><pre>NAME                  READY   STATUS              RESTARTS   AGE
+web-7d9c6b8f5-2xkqp   1/1     Running             0          2m
+web-7d9c6b8f5-h8m4z   1/1     Running             0          2m
+web-7d9c6b8f5-tq9wd   1/1     Running             0          2m
+web-7d9c6b8f5-2xkqp   1/1     <span class="err">Terminating</span>         0          2m
+web-7d9c6b8f5-<span class="ok">wz7lc</span>   0/1     Pending             0          0s
+web-7d9c6b8f5-<span class="ok">wz7lc</span>   0/1     ContainerCreating   0          0s
+web-7d9c6b8f5-<span class="ok">wz7lc</span>   1/1     Running             0          2s</pre></div>
+    <p>Chưa đầy một giây sau khi Pod cũ bắt đầu dừng, Pod mới <code>wz7lc</code> đã được tạo. Đây chính là vòng lặp điều hòa ở bài 1: ReplicaSet thấy còn 2/3, tạo thêm 1. So với bài 3, khác biệt nằm hết ở đây.</p>
+
+    <h2>Thí nghiệm 2: scale</h2>
+    <p>Sửa <code>replicas: 3</code> thành <code>replicas: 5</code> trong file rồi apply lại:</p>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl apply -f web.yaml
+deployment.apps/web configured
+
+$ kubectl get deploy web
+NAME   READY   UP-TO-DATE   AVAILABLE   AGE
+web    5/5     5            5           4m</pre></div>
+    <p><code>configured</code> nghĩa là có thay đổi và đã được áp dụng. Cũng có lệnh tắt <code>kubectl scale deploy/web --replicas=5</code>, nhưng mình nên sửa file: nếu không, lần apply sau file sẽ đưa số bản về 3.</p>
+    <p>Trả lại <code>replicas: 3</code> và apply trước khi qua phần tiếp.</p>
+
+    <h2>Thí nghiệm 3: cập nhật phiên bản (rolling update)</h2>
+    <p>Đổi image lên 6.7.1 — chỉ sửa đúng một dòng:</p>
+<pre data-file="web.yaml" data-add="17"><code class="language-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: podinfo
+          image: ghcr.io/stefanprodan/podinfo:6.7.1
+          ports:
+            - containerPort: 9898</code></pre>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl apply -f web.yaml
+deployment.apps/web configured
+
+$ kubectl rollout status deployment/web
+Waiting for deployment "web" rollout to finish: 1 out of 3 new replicas have been updated...
+Waiting for deployment "web" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "web" rollout to finish: 1 old replicas are pending termination...
+deployment "web" successfully rolled out
+
+$ kubectl get rs -l app=web
+NAME             DESIRED   CURRENT   READY   AGE
+web-7d9c6b8f5    0         0         0       8m      <span class="cm"># phiên bản cũ, giữ lại để rollback</span>
+web-<span class="ok">5f6b9d7c48</span>   3         3         3       40s     <span class="cm"># phiên bản mới</span></pre></div>
+    <p>Chuyện đã xảy ra: Deployment tạo ReplicaSet mới cho template mới, rồi <strong>đổi dần</strong> — tăng ReplicaSet mới lên một bản, đợi bản đó chạy, giảm ReplicaSet cũ đi một bản, lặp lại. Lúc nào cũng có Pod phục vụ, nên người dùng không thấy gián đoạn. Cách đổi dần này gọi là <strong>rolling update</strong>, là mặc định của Deployment.</p>
+
+    <figure class="diagram">
+      <svg class="dg" viewBox="0 0 720 240" role="img" aria-label="Ba giai đoạn của rolling update"><defs><marker id="ah7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="aa7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="zone" x="10" y="10" width="220" height="222" rx="10"/>
+<text x="120" y="34" class="b" text-anchor="middle">Trước khi cập nhật</text>
+<text x="24" y="62" class="s">ReplicaSet cũ · 6.7.0</text>
+<text x="24" y="130" class="s">ReplicaSet mới · 6.7.1</text>
+<rect class="box" x="24" y="70" width="56" height="28" rx="6"/>
+<text x="52" y="89" class="s" text-anchor="middle">Pod</text>
+<rect class="box" x="88" y="70" width="56" height="28" rx="6"/>
+<text x="116" y="89" class="s" text-anchor="middle">Pod</text>
+<rect class="box" x="152" y="70" width="56" height="28" rx="6"/>
+<text x="180" y="89" class="s" text-anchor="middle">Pod</text>
+<text x="24" y="157" class="s">chưa có</text>
+<text x="120" y="210" class="s" text-anchor="middle">3 Pod cũ phục vụ</text>
+<rect class="zone" x="250" y="10" width="220" height="222" rx="10"/>
+<text x="360" y="34" class="b" text-anchor="middle">Đang cập nhật</text>
+<text x="264" y="62" class="s">ReplicaSet cũ · 6.7.0</text>
+<text x="264" y="130" class="s">ReplicaSet mới · 6.7.1</text>
+<rect class="box" x="264" y="70" width="56" height="28" rx="6"/>
+<text x="292" y="89" class="s" text-anchor="middle">Pod</text>
+<rect class="ok" x="264" y="138" width="56" height="28" rx="6"/>
+<text x="292" y="157" class="s" text-anchor="middle">Pod</text>
+<rect class="box" x="328" y="70" width="56" height="28" rx="6"/>
+<text x="356" y="89" class="s" text-anchor="middle">Pod</text>
+<rect class="ok" x="328" y="138" width="56" height="28" rx="6"/>
+<text x="356" y="157" class="s" text-anchor="middle">Pod</text>
+<rect class="ghost" x="392" y="70" width="56" height="28" rx="6"/>
+<text x="420" y="89" class="s" text-anchor="middle">đã gỡ</text>
+<text x="360" y="210" class="s" text-anchor="middle">lúc nào cũng có Pod phục vụ</text>
+<rect class="zone" x="490" y="10" width="220" height="222" rx="10"/>
+<text x="600" y="34" class="b" text-anchor="middle">Sau khi xong</text>
+<text x="504" y="62" class="s">ReplicaSet cũ · 6.7.0</text>
+<text x="504" y="130" class="s">ReplicaSet mới · 6.7.1</text>
+<rect class="ok" x="504" y="138" width="56" height="28" rx="6"/>
+<text x="532" y="157" class="s" text-anchor="middle">Pod</text>
+<rect class="ok" x="568" y="138" width="56" height="28" rx="6"/>
+<text x="596" y="157" class="s" text-anchor="middle">Pod</text>
+<rect class="ok" x="632" y="138" width="56" height="28" rx="6"/>
+<text x="660" y="157" class="s" text-anchor="middle">Pod</text>
+<text x="504" y="89" class="s">0 Pod — giữ lại để rollback</text>
+<text x="600" y="210" class="s" text-anchor="middle">3 Pod mới phục vụ</text>
+<path class="ln-a" d="M232,121 H246" marker-end="url(#aa7)"/>
+<path class="ln-a" d="M472,121 H486" marker-end="url(#aa7)"/>
+      </svg>
+      <figcaption>Rolling update: thêm dần Pod mới, gỡ dần Pod cũ — không có lúc nào app ngừng phục vụ.</figcaption>
+    </figure>
+
+    <h2>Thí nghiệm 4: phiên bản lỗi và rollback</h2>
+    <p>Giả sử lỡ gõ sai tag: <code>podinfo:6.7.9-typo</code> (không tồn tại). Apply rồi xem:</p>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl apply -f web.yaml
+deployment.apps/web configured
+
+$ kubectl rollout status deployment/web
+Waiting for deployment "web" rollout to finish: 1 out of 3 new replicas have been updated...
+^C   <span class="cm"># đứng mãi ở đây, bấm Ctrl+C</span>
+
+$ kubectl get pods -l app=web
+NAME                   READY   STATUS             RESTARTS   AGE
+web-5f6b9d7c48-8kq2w   1/1     Running            0          5m
+web-5f6b9d7c48-lp4xd   1/1     Running            0          5m
+web-5f6b9d7c48-z9rtn   1/1     Running            0          5m
+web-6c8d7f9b5-mj2kd    0/1     <span class="err">ImagePullBackOff</span>   0          45s</pre></div>
+    <p>Điểm quan trọng: <strong>3 Pod cũ vẫn chạy bình thường</strong>. Rolling update dừng lại vì Pod mới không lên được, nên app không sập. Quay lại phiên bản trước:</p>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl rollout undo deployment/web
+deployment.apps/web rolled back
+
+$ kubectl rollout history deployment/web
+deployment.apps/web
+REVISION  CHANGE-CAUSE
+1         &lt;none&gt;
+3         &lt;none&gt;
+4         &lt;none&gt;</pre></div>
+    <p>Pod lỗi bị dọn đi, app về 6.7.1. Nhớ sửa lại tag trong file thành <code>6.7.1</code>, nếu không lần apply sau lại đưa bản lỗi lên.</p>
+
+    <h2>Hoàn thiện: readiness probe và resources</h2>
+    <p>Còn một lỗ hổng: Kubernetes coi Pod là “sẵn sàng” ngay khi container <em>khởi động</em>, dù app bên trong có thể còn đang nạp dữ liệu. Lúc rolling update, nó có thể gỡ Pod cũ trong khi Pod mới chưa thực sự phục vụ được. Thêm hai thứ mà mọi Deployment thật đều nên có:</p>
+<pre data-file="web.yaml" data-add="20-27"><code class="language-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: podinfo
+          image: ghcr.io/stefanprodan/podinfo:6.7.1
+          ports:
+            - containerPort: 9898
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 9898
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi</code></pre>
+    <ul>
+      <li><strong><code>readinessProbe</code></strong> — Kubernetes gọi <code>GET /readyz</code> vài giây một lần. Chỉ khi trả về thành công thì Pod mới được tính là Ready (cột <code>READY 1/1</code>), mới được nhận traffic, và rolling update mới đi tiếp. Mỗi app có đường dẫn kiểm tra riêng — podinfo dùng <code>/readyz</code>.</li>
+      <li><strong><code>resources.requests</code></strong> — “Pod này cần khoảng 0.1 CPU và 64MB RAM”. Scheduler dựa vào đó để chọn node còn đủ chỗ. <code>100m</code> = 100 millicore = 0.1 CPU.</li>
+    </ul>
+    <p>Đây là file Deployment hoàn chỉnh mình sẽ dùng tiếp ở các bài sau.</p>
+    <div class="callout note" data-title="Còn liveness probe?"><p>Có thêm <code>livenessProbe</code>: nếu fail thì kubelet <em>khởi động lại</em> container (dùng khi app có thể bị treo). Cẩn thận: đừng cho liveness kiểm tra database — DB chậm một chút là toàn bộ Pod bị restart cùng lúc.</p></div>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Deployment biết Pod nào là của nó bằng cách nào?</summary><p>Bằng selector.matchLabels: mọi Pod có nhãn khớp được tính là của nó. Template gắn đúng nhãn đó cho Pod mới.</p></details>
+      <details><summary>Đổi replicas từ 3 thành 5 có tạo ReplicaSet mới không? Đổi image thì sao?</summary><p>Đổi replicas: không, ReplicaSet hiện tại chỉ tăng số Pod. Đổi image (hay bất cứ gì trong template): có, tạo ReplicaSet mới và rolling update.</p></details>
+      <details><summary>Rollout kẹt vì image lỗi, người dùng có bị ảnh hưởng không?</summary><p>Không — Pod cũ vẫn chạy và phục vụ. Chạy kubectl rollout undo để quay lại.</p></details>
+      <details><summary>Readiness probe giúp gì trong lúc rolling update?</summary><p>Pod mới chỉ được tính là sẵn sàng (và Pod cũ mới bị gỡ) khi app thực sự trả lời được, tránh khoảng thời gian không có Pod nào phục vụ.</p></details>
+    </div>
+  </section>
+
+  <section class="lesson" id="service" data-part="1 · Cốt lõi" data-title="Service: địa chỉ cố định cho một nhóm Pod" data-minutes="18" data-practice="40" data-updated="2026-11-15" data-done="false" data-summary="Vì sao không gọi thẳng IP Pod, viết Service từng bước, xem nó chia tải và DNS nội bộ.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li>IP của Pod thay đổi liên tục → không gọi thẳng Pod. Gọi qua <strong>Service</strong>: một <strong>tên</strong> và <strong>IP cố định</strong>.</li>
+        <li>Service tìm Pod bằng <code>selector</code> — đúng cơ chế nhãn như Deployment.</li>
+        <li>Trong cluster, gọi app bằng tên Service: <code>http://web</code> (cùng namespace) hoặc <code>http://web.&lt;namespace&gt;</code>.</li>
+        <li>Service chia request đều cho các Pod đang <strong>Ready</strong>.</li>
+      </ul>
+    </div>
+
+    <h2>Vấn đề: gọi Pod nào, ở IP nào?</h2>
+    <p>Deployment <code>web</code> đang có 3 Pod. Xem IP của chúng:</p>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl get pods -l app=web -o wide
+NAME                   READY   STATUS    RESTARTS   AGE   IP            NODE
+web-5f6b9d7c48-8kq2w   1/1     Running   0          10m   10.244.0.12   lab-control-plane
+web-5f6b9d7c48-lp4xd   1/1     Running   0          10m   10.244.0.13   lab-control-plane
+web-5f6b9d7c48-z9rtn   1/1     Running   0          10m   10.244.0.14   lab-control-plane</pre></div>
+    <p>Giả sử có một app <em>frontend</em> cần gọi <code>web</code>. Nó nên gọi IP nào trong ba? Và ở bài trước mình đã thấy: chỉ cần cập nhật phiên bản hay một Pod chết là cả ba IP này đổi hết. Ghi IP vào cấu hình là không thể.</p>
+
+    <h2>Service là gì</h2>
+    <p><strong>Service</strong> đứng trước một nhóm Pod và cho nhóm đó:</p>
+    <ul>
+      <li>một <strong>tên</strong> cố định (ví dụ <code>web</code>) — dùng được như tên miền trong cluster;</li>
+      <li>một <strong>IP ảo cố định</strong> (gọi là ClusterIP) — không đổi suốt đời Service;</li>
+      <li><strong>chia tải</strong>: mỗi request được chuyển tới một trong các Pod phía sau.</li>
+    </ul>
+    <figure class="diagram">
+      <svg class="dg" viewBox="0 0 720 262" role="img" aria-label="Service chọn Pod theo nhãn và chia tải"><defs><marker id="ah8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="aa8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="box" x="16" y="100" width="128" height="56" rx="8"/>
+<text x="80" y="124" class="b" text-anchor="middle">frontend</text>
+<text x="80" y="142" class="s m" text-anchor="middle">gọi http://web</text>
+<rect class="acc" x="196" y="84" width="180" height="88" rx="8"/>
+<text x="286" y="110" class="b" text-anchor="middle">Service “web”</text>
+<text x="286" y="128" class="s m" text-anchor="middle">10.96.142.37</text>
+<text x="286" y="148" class="s m" text-anchor="middle">selector: app=web</text>
+<rect class="ok" x="450" y="16" width="254" height="46" rx="8"/>
+<text x="466" y="36" class="b">Pod · nhãn app=web</text>
+<text x="466" y="53" class="s m">10.244.0.12</text>
+<rect class="ok" x="450" y="76" width="254" height="46" rx="8"/>
+<text x="466" y="96" class="b">Pod · nhãn app=web</text>
+<text x="466" y="113" class="s m">10.244.0.13</text>
+<rect class="ok" x="450" y="136" width="254" height="46" rx="8"/>
+<text x="466" y="156" class="b">Pod · nhãn app=web</text>
+<text x="466" y="173" class="s m">10.244.0.14</text>
+<rect class="ghost" x="450" y="200" width="254" height="52" rx="8"/>
+<text x="466" y="221" class="b">Pod · nhãn app=api</text>
+<text x="466" y="239" class="s">nhãn không khớp → không nhận traffic</text>
+<path class="ln-a" d="M144,128 H192" marker-end="url(#aa8)"/>
+<path class="ln-a" d="M376,128 L446,40" marker-end="url(#aa8)"/>
+<path class="ln-a" d="M376,128 L446,99" marker-end="url(#aa8)"/>
+<path class="ln-a" d="M376,128 L446,158" marker-end="url(#aa8)"/>
+      </svg>
+      <figcaption>Service không biết Deployment là gì — nó chỉ tìm Pod theo nhãn, rồi chia request cho các Pod đang Ready.</figcaption>
+    </figure>
+    <p>Pod đến và đi, Service tự cập nhật danh sách. Bên gọi chỉ cần nhớ một cái tên.</p>
+
+    <h2>Viết Service, từng bước</h2>
+    <p>Mình thêm Service vào <strong>cùng file</strong> <code>web.yaml</code>, ngăn với Deployment bằng dòng <code>---</code> (trong YAML, <code>---</code> phân tách nhiều object trong một file). Để gọn, đoạn dưới chỉ hiện phần Service.</p>
+
+    <h3>Bước 1 — Phần đầu</h3>
+<pre data-file="web.yaml (phần thêm vào cuối)" data-add="1-5"><code class="language-yaml">---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web</code></pre>
+    <p>Tên Service chính là tên dùng để gọi. Đặt trùng tên Deployment là thói quen phổ biến cho dễ nhớ.</p>
+
+    <h3>Bước 2 — Gửi traffic tới Pod nào?</h3>
+<pre data-file="web.yaml (phần thêm vào cuối)" data-add="6-8"><code class="language-yaml">---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+spec:
+  selector:
+    app: web</code></pre>
+    <p>“Gửi traffic tới mọi Pod có nhãn <code>app: web</code>.” Service không biết gì về Deployment — nó chỉ nhìn nhãn trên Pod.</p>
+
+    <h3>Bước 3 — Cổng</h3>
+<pre data-file="web.yaml (phần thêm vào cuối)" data-add="9-11"><code class="language-yaml">---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+spec:
+  selector:
+    app: web
+  ports:
+    - port: 80
+      targetPort: 9898</code></pre>
+    <ul>
+      <li><code>port: 80</code> — cổng <em>của Service</em>, bên gọi dùng cổng này: <code>http://web:80</code> (80 là mặc định của HTTP nên viết <code>http://web</code> là đủ).</li>
+      <li><code>targetPort: 9898</code> — cổng <em>của container</em> mà traffic được chuyển tới.</li>
+    </ul>
+    <p>Nhờ tách hai cổng, bên gọi không cần biết app bên trong lắng nghe cổng lạ nào.</p>
+
+    <h2>Apply và xem</h2>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl apply -f web.yaml
+deployment.apps/web unchanged
+service/web created
+
+$ kubectl get service web
+NAME   TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE
+web    ClusterIP   10.96.142.37   &lt;none&gt;        80/TCP    10s</pre></div>
+    <p>Deployment không đổi (<code>unchanged</code>), Service được tạo. <code>CLUSTER-IP</code> là IP ảo cố định. <code>EXTERNAL-IP &lt;none&gt;</code>: Service này chỉ dùng được bên trong cluster.</p>
+    <p>Service đang trỏ tới những Pod nào? Danh sách đó nằm trong <strong>EndpointSlice</strong>:</p>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl get endpointslices -l kubernetes.io/service-name=web
+NAME        ADDRESSTYPE   PORTS   ENDPOINTS                             AGE
+web-x7k2p   IPv4          9898    10.244.0.12,10.244.0.13,10.244.0.14   15s</pre></div>
+    <p>Đúng 3 IP của 3 Pod. Đây là lệnh mình sẽ chạy đầu tiên mỗi khi “gọi Service mà không ai trả lời”: danh sách trống nghĩa là selector không khớp nhãn Pod nào.</p>
+
+    <h2>Gọi thử từ bên trong cluster</h2>
+    <p>Service kiểu ClusterIP chỉ gọi được từ trong cluster. Tạo một Pod tạm có sẵn công cụ mạng, đứng trong đó gọi (<code>--rm</code>: tự xóa Pod khi thoát):</p>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl run tmp --rm -it --image=busybox:1.36 --restart=Never -- sh
+If you don't see a command prompt, try pressing enter.
+/ # wget -qO- http://web | grep hostname
+  "hostname": "web-5f6b9d7c48-<span class="hl">8kq2w</span>",
+/ # wget -qO- http://web | grep hostname
+  "hostname": "web-5f6b9d7c48-<span class="hl">z9rtn</span>",
+/ # wget -qO- http://web | grep hostname
+  "hostname": "web-5f6b9d7c48-<span class="hl">lp4xd</span>",</pre></div>
+    <p>Cùng gọi <code>http://web</code>, mỗi lần trả lời là một Pod khác — Service đang chia tải. Đây là lúc chi tiết “hostname = tên Pod” ở bài 3 phát huy tác dụng.</p>
+
+    <h2>DNS: vì sao gọi được bằng tên <code>web</code></h2>
+    <p>Nhớ <code>coredns</code> trong danh sách Pod hệ thống ở bài 2? Nó tự tạo bản ghi DNS cho mọi Service. Vẫn trong Pod tạm:</p>
+    <div class="term" data-title="trong Pod tmp"><pre>/ # nslookup web
+Server:		10.96.0.10
+Address:	10.96.0.10:53
+
+Name:	<span class="hl">web.demo.svc.cluster.local</span>
+Address: 10.96.142.37
+/ # exit
+pod "tmp" deleted</pre></div>
+    <p>Tên đầy đủ có dạng <code>&lt;service&gt;.&lt;namespace&gt;.svc.cluster.local</code>. Trong thực tế:</p>
+    <table>
+      <thead><tr><th>Gọi từ</th><th>Viết</th></tr></thead>
+      <tbody>
+        <tr><td>Pod cùng namespace <code>demo</code></td><td><code>http://web</code></td></tr>
+        <tr><td>Pod ở namespace khác</td><td><code>http://web.demo</code></td></tr>
+      </tbody>
+    </table>
+    <p>Vậy cấu hình của frontend chỉ cần ghi <code>API_URL=http://web</code> — không bao giờ phải biết IP nào.</p>
+
+    <h2>Mở Service ra máy mình</h2>
+    <p>Giống bài 3, nhưng port-forward tới <strong>Service</strong> thay vì một Pod cụ thể:</p>
+    <div class="term" data-title="terminal 2"><pre>$ kubectl port-forward service/web 8080:80
+Forwarding from 127.0.0.1:8080 -> 9898</pre></div>
+    <p>Mở <code>http://localhost:8080</code> trên trình duyệt là thấy giao diện podinfo.</p>
+    <div class="callout note"><p><code>port-forward</code> chỉ dùng để thử trên máy mình. Đưa app ra cho người dùng thật là việc của <strong>Ingress</strong> (bài 7).</p></div>
+
+    <h2>Các loại Service</h2>
+    <p>Service mình vừa tạo là loại <strong>ClusterIP</strong> — mặc định và phổ biến nhất. Biết thêm hai loại khác để đọc hiểu khi gặp:</p>
+    <table>
+      <thead><tr><th>type</th><th>Truy cập từ</th><th>Dùng khi</th></tr></thead>
+      <tbody>
+        <tr><td><code>ClusterIP</code></td><td>Chỉ trong cluster</td><td>App gọi nhau nội bộ. Dùng cho hầu hết mọi thứ.</td></tr>
+        <tr><td><code>LoadBalancer</code></td><td>Internet (IP public)</td><td>Trên cloud: tự tạo load balancer của AWS/GCP. Mỗi Service một IP, tốn tiền nên thường dùng Ingress thay thế.</td></tr>
+        <tr><td><code>NodePort</code></td><td>Cổng 30000–32767 trên mọi node</td><td>Thử nghiệm; hiếm khi dùng thật.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Service tìm Pod để gửi traffic bằng cách nào?</summary><p>Bằng selector: mọi Pod có nhãn khớp (và đang Ready) nằm trong danh sách EndpointSlice của Service.</p></details>
+      <details><summary>port và targetPort khác nhau thế nào?</summary><p>port là cổng bên gọi dùng (cổng của Service); targetPort là cổng container lắng nghe, nơi traffic được chuyển tới.</p></details>
+      <details><summary>Service api ở namespace payments, app ở namespace shop gọi bằng địa chỉ nào?</summary><p>http://api.payments</p></details>
+      <details><summary>kubectl get endpointslices cho thấy ENDPOINTS trống, nghi ngờ gì?</summary><p>Selector của Service không khớp nhãn Pod nào, hoặc các Pod đều chưa Ready.</p></details>
+    </div>
+  </section>
+
+  <section class="lesson" id="configmap-secret" data-part="1 · Cốt lõi" data-title="ConfigMap và Secret: cấu hình nằm ngoài image" data-minutes="18" data-practice="40" data-updated="2026-11-15" data-done="false" data-summary="Đưa cấu hình vào app bằng biến môi trường, tách ra ConfigMap, cất mật khẩu vào Secret.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li>Một image dùng cho mọi môi trường; cái khác nhau (URL database, log level, mật khẩu) đưa vào lúc chạy.</li>
+        <li>Cấu hình thường → <strong>ConfigMap</strong>. Mật khẩu, token → <strong>Secret</strong>. Cả hai thường được đưa vào app dưới dạng <strong>biến môi trường</strong>.</li>
+        <li>Biến môi trường chỉ được đọc lúc container khởi động → đổi giá trị xong phải <code>kubectl rollout restart</code>.</li>
+        <li>Secret chỉ được mã hóa base64 — <strong>không phải mã hóa bảo mật</strong>.</li>
+      </ul>
+    </div>
+
+    <h2>Vì sao cấu hình không nằm trong image</h2>
+    <p>Cùng một app chạy ở dev, staging, production. Mỗi nơi có database khác, mức log khác, mật khẩu khác. Nếu nhét cấu hình vào image, mình phải build ba image khác nhau — và thứ đã test ở staging không còn là thứ chạy trên production. Quy tắc chung: <strong>build một image, cấu hình đưa vào khi chạy</strong>, thường qua biến môi trường.</p>
+    <p>podinfo đọc biến môi trường <code>PODINFO_UI_MESSAGE</code> để đặt câu <code>message</code> nó trả về. Mình dùng nó để thấy cấu hình có vào được app hay không.</p>
+
+    <h2>Cách 1: ghi biến môi trường thẳng trong Deployment</h2>
+    <p>Cách đơn giản nhất — thêm khối <code>env</code> vào container trong <code>web.yaml</code>. Để dễ nhìn, các đoạn trong bài này chỉ hiện phần <code>containers</code> và lược bớt <code>readinessProbe</code>, <code>resources</code> — trong file của bạn cứ giữ nguyên hai khối đó.</p>
+<pre data-file="web.yaml (phần containers)" data-add="5-7"><code class="language-yaml">      containers:
+        - name: podinfo
+          image: ghcr.io/stefanprodan/podinfo:6.7.1
+          ports: [{ containerPort: 9898 }]
+          env:
+            - name: PODINFO_UI_MESSAGE
+              value: "Xin chao tu Kubernetes"</code></pre>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl apply -f web.yaml
+deployment.apps/web configured
+service/web unchanged
+
+$ kubectl rollout status deploy/web
+deployment "web" successfully rolled out
+
+$ curl -s localhost:8080 | grep message      <span class="cm"># port-forward ở terminal 2 vẫn đang chạy</span>
+  "message": "<span class="hl">Xin chao tu Kubernetes</span>",</pre></div>
+    <p>Để ý: thêm <code>env</code> là thay đổi <code>template</code>, nên Deployment làm hẳn một rolling update — Pod cũ được thay bằng Pod mới có biến môi trường.</p>
+    <p>Chạy được, nhưng cấu hình đang <strong>dính chặt vào Deployment</strong>. Muốn dev và prod có message khác nhau thì phải có hai bản Deployment. Tách ra cho gọn.</p>
+
+    <h2>Cách 2: tách ra ConfigMap</h2>
+    <p><strong>ConfigMap</strong> là một object chỉ chứa các cặp key: value cấu hình.</p>
+<pre data-file="web-config.yaml"><code class="language-yaml">apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-config
+data:
+  PODINFO_UI_MESSAGE: "Xin chao tu ConfigMap"
+  PODINFO_UI_COLOR: "#1f5fbf"</code></pre>
+    <p>Rồi trong Deployment, thay khối <code>env</code> bằng <code>envFrom</code> — “lấy <em>mọi</em> key trong ConfigMap này làm biến môi trường”:</p>
+<pre data-file="web.yaml (phần containers)" data-add="5-7"><code class="language-yaml">      containers:
+        - name: podinfo
+          image: ghcr.io/stefanprodan/podinfo:6.7.1
+          ports: [{ containerPort: 9898 }]
+          envFrom:
+            - configMapRef:
+                name: web-config</code></pre>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl apply -f web-config.yaml -f web.yaml
+configmap/web-config created
+deployment.apps/web configured
+service/web unchanged
+
+$ kubectl get configmap web-config
+NAME         DATA   AGE
+web-config   2      12s
+
+$ curl -s localhost:8080 | grep -E 'message|color'
+  "color": "<span class="hl">#1f5fbf</span>",
+  "message": "<span class="hl">Xin chao tu ConfigMap</span>",</pre></div>
+    <p>Giờ Deployment chỉ nói “đọc cấu hình từ <code>web-config</code>”, còn giá trị nằm riêng. Mỗi môi trường có một ConfigMap riêng là xong.</p>
+
+    <h2>Cái bẫy: sửa ConfigMap mà app không đổi</h2>
+    <p>Đổi message trong <code>web-config.yaml</code> thành <code>"Phien ban 2"</code> rồi apply:</p>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl apply -f web-config.yaml
+configmap/web-config configured
+
+$ curl -s localhost:8080 | grep message
+  "message": "<span class="err">Xin chao tu ConfigMap</span>",     <span class="cm"># vẫn giá trị cũ!</span></pre></div>
+    <p>Lần này <code>web.yaml</code> không đổi gì, nên Deployment không tạo Pod mới. Mà biến môi trường chỉ được đọc <strong>một lần lúc container khởi động</strong> — Pod đang chạy vẫn giữ giá trị cũ. Phải yêu cầu Deployment thay Pod:</p>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl rollout restart deployment/web
+deployment.apps/web restarted
+
+$ kubectl rollout status deployment/web
+deployment "web" successfully rolled out
+
+$ curl -s localhost:8080 | grep message
+  "message": "<span class="ok">Phien ban 2</span>",</pre></div>
+    <p><code>rollout restart</code> làm một rolling update y như đổi image — không downtime.</p>
+
+    <h2>Secret: cho mật khẩu và token</h2>
+    <p>Mật khẩu database, API key không nên nằm chung với cấu hình thường. Kubernetes có object riêng là <strong>Secret</strong>. Cách tạo nhanh nhất là bằng lệnh — để giá trị không phải nằm trong file nào:</p>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl create secret generic web-secret --from-literal=DB_PASSWORD='s3cret!'
+secret/web-secret created
+
+$ kubectl get secret web-secret -o yaml
+apiVersion: v1
+data:
+  DB_PASSWORD: <span class="hl">czNjcmV0IQ==</span>
+kind: Secret
+metadata:
+  name: web-secret
+  namespace: demo
+type: Opaque</pre></div>
+    <p>Giá trị trông như đã được mã hóa, nhưng thực ra chỉ là <strong>base64</strong> — ai cũng giải được:</p>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ echo czNjcmV0IQ== | base64 -d
+s3cret!</pre></div>
+    <div class="callout warning" data-title="Mình đã giật mình ở chỗ này"><p>Secret <strong>không bí mật hơn ConfigMap</strong> về mặt dữ liệu. Thứ bảo vệ nó là <strong>phân quyền</strong>: có thể cấp cho người khác quyền xem ConfigMap nhưng không cho xem Secret. Vì vậy: không commit Secret thật lên Git, không in giá trị ra log.</p></div>
+    <p>Đưa Secret vào app — thêm một mục nữa vào <code>envFrom</code>:</p>
+<pre data-file="web.yaml (phần containers)" data-add="8-9"><code class="language-yaml">      containers:
+        - name: podinfo
+          image: ghcr.io/stefanprodan/podinfo:6.7.1
+          ports: [{ containerPort: 9898 }]
+          envFrom:
+            - configMapRef:
+                name: web-config
+            - secretRef:
+                name: web-secret</code></pre>
+    <p>Kiểm tra bằng cách nhìn biến môi trường bên trong container:</p>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl apply -f web.yaml
+deployment.apps/web configured
+service/web unchanged
+
+$ kubectl exec deploy/web -- env | grep -E 'PODINFO_UI|DB_PASSWORD'
+PODINFO_UI_MESSAGE=Phien ban 2
+PODINFO_UI_COLOR=#1f5fbf
+DB_PASSWORD=s3cret!</pre></div>
+    <p><code>kubectl exec deploy/web</code> là cách viết tắt: chạy lệnh trong một Pod bất kỳ của Deployment, khỏi phải chép tên Pod.</p>
+
+        <figure class="diagram">
+      <svg class="dg" viewBox="0 0 720 210" role="img" aria-label="ConfigMap và Secret được đưa vào container thành biến môi trường"><defs><marker id="ah9" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="aa9" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="ok" x="16" y="22" width="236" height="78" rx="8"/>
+<text x="32" y="46" class="b">ConfigMap “web-config”</text>
+<text x="32" y="66" class="s m">PODINFO_UI_MESSAGE=…</text>
+<text x="32" y="84" class="s m">PODINFO_UI_COLOR=…</text>
+<rect class="warn" x="16" y="120" width="236" height="78" rx="8"/>
+<text x="32" y="144" class="b">Secret “web-secret”</text>
+<text x="32" y="164" class="s m">DB_PASSWORD=czNjcmV0IQ==</text>
+<text x="32" y="182" class="s">chỉ là base64, không phải mã hóa</text>
+<rect class="acc" x="330" y="22" width="374" height="176" rx="10"/>
+<text x="346" y="46" class="b">Pod (do Deployment tạo)</text>
+<rect class="box" x="346" y="60" width="342" height="124" rx="8"/>
+<text x="362" y="84" class="b">container podinfo — biến môi trường:</text>
+<text x="362" y="106" class="s m">PODINFO_UI_MESSAGE=Phien ban 2</text>
+<text x="362" y="126" class="s m">PODINFO_UI_COLOR=#1f5fbf</text>
+<text x="362" y="146" class="s m">DB_PASSWORD=s3cret!</text>
+<text x="362" y="170" class="s">đọc một lần lúc container khởi động</text>
+<path class="ln-a" d="M252,61 L342,100" marker-end="url(#aa9)"/>
+<path class="ln-a" d="M252,159 L342,140" marker-end="url(#aa9)"/>
+<text x="292" y="66" class="s a" text-anchor="middle">envFrom</text>
+<text x="292" y="172" class="s a" text-anchor="middle">envFrom</text>
+      </svg>
+      <figcaption>Cấu hình nằm ngoài image; lúc Pod khởi động, Kubernetes nạp chúng thành biến môi trường.</figcaption>
+    </figure>
+    <h2>Lấy một key riêng lẻ</h2>
+    <p><code>envFrom</code> lấy hết mọi key. Khi chỉ cần một key, hoặc muốn đặt tên biến khác, dùng <code>env</code> với <code>valueFrom</code>:</p>
+<pre><code class="language-yaml">env:
+  - name: DATABASE_PASSWORD        # tên biến trong app
+    valueFrom:
+      secretKeyRef:
+        name: web-secret           # Secret nào
+        key: DB_PASSWORD           # key nào trong đó</code></pre>
+
+    <h2>Secret thật ở công ty để đâu?</h2>
+    <p>Nếu mọi YAML nằm trong Git nhưng Secret thì không được commit, vậy giá trị thật ở đâu? Thường là một trong các cách: lưu trong Vault / AWS Secrets Manager rồi dùng <strong>External Secrets Operator</strong> kéo vào cluster, hoặc mã hóa thật bằng <strong>Sealed Secrets</strong> / <strong>SOPS</strong> trước khi commit. Khi đi làm, hỏi team đang dùng cách nào — không cần học trước.</p>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Sửa ConfigMap (dùng qua envFrom) rồi nhưng app vẫn đọc giá trị cũ. Vì sao, xử lý thế nào?</summary><p>Biến môi trường chỉ đọc khi container khởi động. Chạy kubectl rollout restart deployment/&lt;tên&gt; để tạo Pod mới.</p></details>
+      <details><summary>Secret có an toàn chỉ vì giá trị được base64?</summary><p>Không. Base64 ai cũng giải được. An toàn đến từ phân quyền, không commit lên Git và cách lưu trữ ở cluster.</p></details>
+      <details><summary>envFrom và env + valueFrom khác nhau thế nào?</summary><p>envFrom đưa mọi key của ConfigMap/Secret thành biến môi trường cùng tên; env + valueFrom lấy từng key, đặt được tên biến tùy ý.</p></details>
+    </div>
+  </section>
+
+  <section class="lesson" id="ingress" data-part="1 · Cốt lõi" data-title="Ingress: đưa app ra cho người dùng" data-minutes="18" data-practice="40" data-updated="2026-11-15" data-done="false" data-summary="Một cửa vào chung, định tuyến theo domain và đường dẫn tới đúng Service.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><strong>Ingress</strong> = bảng luật “domain/đường dẫn nào → Service nào”, cho traffic từ bên ngoài vào.</li>
+        <li>Bảng luật cần người đọc: <strong>Ingress controller</strong> (Traefik, NGINX…) — phải được cài trong cluster. Ở công ty thường đã có sẵn.</li>
+        <li>Luồng đầy đủ: <code>người dùng → Ingress controller → Service → Pod</code>.</li>
+      </ul>
+    </div>
+
+    <h2>Vấn đề</h2>
+    <p>Service ClusterIP chỉ gọi được bên trong cluster. <code>port-forward</code> chỉ cho riêng máy mình. Người dùng thật cần vào bằng một domain như <code>shop.com</code>. Có thể dùng Service kiểu <code>LoadBalancer</code>, nhưng mỗi Service sẽ tốn một load balancer và một IP public — có 10 app là 10 cái, vừa tốn tiền vừa khó quản lý.</p>
+    <p>Cách phổ biến: dựng <strong>một cửa vào chung</strong>, rồi định tuyến theo domain và đường dẫn:</p>
+    <figure class="diagram">
+      <svg class="dg" viewBox="0 0 720 230" role="img" aria-label="Ingress controller định tuyến theo path tới các Service"><defs><marker id="ah10" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="aa10" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="box" x="10" y="90" width="108" height="52" rx="8"/>
+<text x="64" y="112" class="b" text-anchor="middle">Internet</text>
+<text x="64" y="130" class="s m" text-anchor="middle">shop.com</text>
+<rect class="acc" x="156" y="74" width="180" height="84" rx="8"/>
+<text x="246" y="100" class="b" text-anchor="middle">Ingress controller</text>
+<text x="246" y="118" class="s" text-anchor="middle">vd: Traefik</text>
+<text x="246" y="138" class="s" text-anchor="middle">đọc các luật Ingress</text>
+<text x="477" y="18" class="s m" text-anchor="middle">path: /</text>
+<rect class="box" x="402" y="26" width="150" height="52" rx="8"/>
+<text x="477" y="48" class="b" text-anchor="middle">Service web</text>
+<text x="477" y="66" class="s" text-anchor="middle">cổng 80</text>
+<text x="477" y="220" class="s m" text-anchor="middle">path: /api</text>
+<rect class="box" x="402" y="150" width="150" height="52" rx="8"/>
+<text x="477" y="172" class="b" text-anchor="middle">Service api</text>
+<text x="477" y="190" class="s" text-anchor="middle">cổng 80</text>
+<rect class="ok" x="590" y="26" width="120" height="52" rx="8"/>
+<text x="650" y="48" class="b" text-anchor="middle">Pod web</text>
+<text x="650" y="66" class="s" text-anchor="middle">× 3</text>
+<rect class="ok" x="590" y="150" width="120" height="52" rx="8"/>
+<text x="650" y="172" class="b" text-anchor="middle">Pod api</text>
+<text x="650" y="190" class="s" text-anchor="middle">× 1</text>
+<path class="ln-a" d="M118,116 H152" marker-end="url(#aa10)"/>
+<path class="ln-a" d="M336,104 L398,56" marker-end="url(#aa10)"/>
+<path class="ln-a" d="M336,128 L398,172" marker-end="url(#aa10)"/>
+<path class="ln" d="M552,52 H586" marker-end="url(#ah10)"/>
+<path class="ln" d="M552,176 H586" marker-end="url(#ah10)"/>
+      </svg>
+      <figcaption>Một cửa vào chung cho nhiều app: controller đọc luật Ingress và chuyển request tới đúng Service.</figcaption>
+    </figure>
+
+    <h2>Ingress và Ingress controller</h2>
+    <p>Hai thứ hay bị nhầm, mình tách ra cho rõ:</p>
+    <ul>
+      <li><strong>Ingress</strong> — một object YAML, chỉ là <em>bảng chỉ đường</em>: “host X, path Y thì gửi tới Service Z”. Tự nó không làm gì cả.</li>
+      <li><strong>Ingress controller</strong> — một app thật (thường là reverse proxy như Traefik, NGINX, HAProxy) chạy trong cluster, <em>đọc</em> các Ingress và chuyển traffic theo đó. Giống người bảo vệ đứng ở cổng đọc bảng chỉ đường.</li>
+    </ul>
+    <p>Cluster mới tạo chưa có controller. Ở công ty, đội hạ tầng đã cài sẵn — mình chỉ viết object Ingress. Để thực hành trên kind, mình tự cài Traefik.</p>
+
+    <h2>Cài Traefik</h2>
+    <p>Dùng <strong>Helm</strong> — công cụ cài phần mềm có sẵn vào cluster, giống <code>brew</code> cho Kubernetes (Phần 2 nói thêm, giờ chỉ cần chạy):</p>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ brew install helm
+$ helm repo add traefik https://traefik.github.io/charts
+"traefik" has been added to your repositories
+
+$ helm install traefik traefik/traefik -n traefik --create-namespace
+NAME: traefik
+LAST DEPLOYED: Sun Nov 15 16:40:02 2026
+NAMESPACE: traefik
+STATUS: deployed
+REVISION: 1
+
+$ kubectl get pods -n traefik
+NAME                       READY   STATUS    RESTARTS   AGE
+traefik-6b8f7d9c5d-qk2lx   1/1     Running   0          30s</pre></div>
+    <p>Traefik cũng có Service riêng. Trên cloud, Service này sẽ có IP public; trên kind thì mình port-forward vào nó — cổng 8000 trên máy mình sẽ đóng vai “cửa vào từ Internet”:</p>
+    <div class="term" data-title="terminal 3"><pre>$ kubectl port-forward -n traefik service/traefik 8000:80
+Forwarding from 127.0.0.1:8000 -> 8000</pre></div>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ curl localhost:8000
+404 page not found</pre></div>
+    <p>404 là đúng: Traefik đang chạy nhưng chưa có luật nào.</p>
+
+    <h2>Viết Ingress, từng bước</h2>
+    <h3>Bước 1 — Phần đầu và controller nào xử lý</h3>
+<pre data-file="web-ingress.yaml" data-add="1-6"><code class="language-yaml">apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web
+spec:
+  ingressClassName: traefik</code></pre>
+    <p>Một cluster có thể có nhiều controller. <code>ingressClassName</code> nói Ingress này dành cho controller nào. Xem các lựa chọn bằng <code>kubectl get ingressclass</code>.</p>
+
+    <h3>Bước 2 — Luật: domain nào, đường dẫn nào, tới đâu</h3>
+<pre data-file="web-ingress.yaml" data-add="7-17"><code class="language-yaml">apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: web.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80</code></pre>
+    <p>Đọc thành câu: <em>“Request tới host <code>web.local</code>, đường dẫn bắt đầu bằng <code>/</code> (tức mọi đường dẫn) → gửi tới Service <code>web</code> cổng 80.”</em></p>
+    <ul>
+      <li><code>host</code> — domain. Controller nhìn header <code>Host</code> của request để biết người dùng gõ domain nào.</li>
+      <li><code>pathType: Prefix</code> — khớp mọi đường dẫn bắt đầu bằng <code>path</code>. Gần như lúc nào cũng dùng Prefix.</li>
+      <li><code>backend.service</code> — Service đích và <strong>cổng của Service</strong> (80), không phải cổng container.</li>
+    </ul>
+
+    <h3>Bước 3 — Apply và gọi thử</h3>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl apply -f web-ingress.yaml
+ingress.networking.k8s.io/web created
+
+$ kubectl get ingress
+NAME   CLASS     HOSTS       ADDRESS   PORTS   AGE
+web    traefik   web.local             80      8s
+
+$ curl -H "Host: web.local" localhost:8000 | grep -E 'hostname|message'
+  "hostname": "web-5f6b9d7c48-lp4xd",
+  "message": "Phien ban 2",</pre></div>
+    <p>Vì <code>web.local</code> không phải domain thật, mình giả lập bằng cách gửi kèm header <code>-H "Host: web.local"</code>. Thực tế, DNS của <code>shop.com</code> trỏ về IP của controller và trình duyệt tự gửi header này.</p>
+    <p>Request đã đi đủ đường: <code>curl → Traefik → Service web → một Pod</code>, và nhận được message từ ConfigMap ở bài trước.</p>
+
+    <h2>Thêm một đường dẫn tới app thứ hai</h2>
+    <p>Sức mạnh của Ingress là một domain chia cho nhiều app. Tạo nhanh app thứ hai tên <code>api</code> (vẫn dùng podinfo cho tiện — nó có sẵn đường dẫn <code>/api/info</code>):</p>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl create deployment api --image=ghcr.io/stefanprodan/podinfo:6.7.1
+deployment.apps/api created
+
+$ kubectl expose deployment api --port=80 --target-port=9898
+service/api exposed</pre></div>
+    <p><code>kubectl expose</code> là cách tắt để tạo Service cho một Deployment — tiện khi thử nghiệm. Giờ thêm luật cho <code>/api</code>:</p>
+<pre data-file="web-ingress.yaml" data-add="11-17"><code class="language-yaml">apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: web.local
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80</code></pre>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl apply -f web-ingress.yaml
+ingress.networking.k8s.io/web configured
+
+$ curl -s -H "Host: web.local" localhost:8000/ | grep hostname
+  "hostname": "<span class="hl">web</span>-5f6b9d7c48-8kq2w",
+
+$ curl -s -H "Host: web.local" localhost:8000/api/info | grep hostname
+  "hostname": "<span class="hl">api</span>-7c5d8f6b9-x2mpl",</pre></div>
+    <p>Cùng domain, <code>/</code> vào <code>web</code>, <code>/api/...</code> vào <code>api</code>. Khi nhiều đường dẫn cùng khớp, đường dẫn <strong>dài hơn</strong> được ưu tiên, nên <code>/api/info</code> rơi vào luật <code>/api</code> chứ không phải <code>/</code>.</p>
+
+    <h2>HTTPS</h2>
+    <p>Thêm khối <code>tls</code> vào Ingress, trỏ tới một Secret chứa chứng chỉ:</p>
+<pre><code class="language-yaml">spec:
+  tls:
+    - hosts: ["shop.com"]
+      secretName: shop-com-tls</code></pre>
+    <p>Ở công ty, chứng chỉ thường do <strong>cert-manager</strong> tự xin từ Let's Encrypt và tự gia hạn — mình chỉ cần thêm một annotation theo hướng dẫn của team.</p>
+
+    <div class="callout note" data-title="Sẽ gặp khi đọc tài liệu"><ul><li><strong>ingress-nginx</strong> — controller cực phổ biến trong tài liệu cũ, nhưng dự án cộng đồng này đã ngừng phát triển từ năm 2026. Thấy trong hướng dẫn thì hiểu nó là “một Ingress controller”, ý tưởng không đổi.</li><li><strong>Gateway API</strong> (object <code>Gateway</code>, <code>HTTPRoute</code>) — thế hệ mới thay dần Ingress, cùng ý tưởng “luật định tuyến tới Service”. Gặp thì tra, đọc hiểu được Ingress là đọc được nó.</li></ul></div>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Tạo Ingress xong mà curl không thấy gì khác. Nghi ngờ gì đầu tiên?</summary><p>Cluster chưa có Ingress controller, hoặc ingressClassName không khớp controller đang có (xem kubectl get ingressclass).</p></details>
+      <details><summary>Trong backend của Ingress, port là cổng nào: của Service hay container?</summary><p>Cổng của Service (ở ví dụ là 80). Service mới chuyển tiếp tới cổng container.</p></details>
+      <details><summary>Request tới /api/info khớp cả luật / và /api. Luật nào thắng?</summary><p>Luật /api — đường dẫn khớp dài hơn được ưu tiên.</p></details>
+    </div>
+  </section>
+
+  <section class="lesson" id="debug" data-part="1 · Cốt lõi" data-title="Debug: đọc lỗi và sửa" data-minutes="20" data-practice="40" data-updated="2026-11-15" data-done="false" data-summary="Quy trình 4 bước và cách đọc output của từng lỗi hay gặp nhất.">
+    <div class="callout note" data-title="Cần nhớ — quy trình 4 bước">
+      <ol>
+        <li><code>kubectl get pods</code> — nhìn <code>STATUS</code>, <code>READY</code>, <code>RESTARTS</code>.</li>
+        <li><code>kubectl describe pod &lt;tên&gt;</code> — đọc <strong>Events</strong> ở cuối.</li>
+        <li><code>kubectl logs &lt;tên&gt; --previous</code> — log của lần chạy vừa crash.</li>
+        <li><code>kubectl exec -it &lt;tên&gt; -- sh</code> — vào bên trong kiểm tra.</li>
+      </ol>
+    </div>
+    <p>Phần lớn thời gian làm Kubernetes là tìm hiểu vì sao một thứ không chạy. Tin tốt: lỗi lặp đi lặp lại, và Kubernetes ghi lại khá rõ chuyện gì đã xảy ra — chỉ cần biết đọc ở đâu. Bài này đi qua từng lỗi: <strong>thấy gì → đọc ở đâu → nguyên nhân → sửa</strong>.</p>
+
+    <h2>Lỗi 1: ImagePullBackOff — không kéo được image</h2>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl get pods
+NAME                       READY   STATUS             RESTARTS   AGE
+broken-1-6d8f9c7b5-m2xkq   0/1     <span class="err">ImagePullBackOff</span>   0          40s
+
+$ kubectl describe pod broken-1-6d8f9c7b5-m2xkq
+...
+Events:
+  Type     Reason     Age   From     Message
+  ----     ------     ----  ----     -------
+  Normal   Pulling    38s   kubelet  Pulling image "nginx:1.27-typo"
+  Warning  Failed     36s   kubelet  Failed to pull image "nginx:1.27-typo": ... <span class="err">not found</span>
+  Warning  Failed     36s   kubelet  Error: ErrImagePull
+  Normal   BackOff    10s   kubelet  Back-off pulling image "nginx:1.27-typo"
+  Warning  Failed     10s   kubelet  Error: ImagePullBackOff</pre></div>
+    <ul>
+      <li><strong>Nguyên nhân hay gặp:</strong> sai tên hoặc tag image (như trên); image ở registry riêng mà cluster chưa có quyền kéo (Events sẽ ghi <code>unauthorized</code> hoặc <code>denied</code>).</li>
+      <li><strong>Sửa:</strong> sửa tag trong YAML rồi apply. Với registry riêng: hỏi team về <code>imagePullSecrets</code>.</li>
+      <li><em>BackOff</em> nghĩa là Kubernetes đang chờ lâu dần giữa các lần thử lại — nó vẫn đang thử, không bỏ cuộc.</li>
+    </ul>
+
+    <h2>Lỗi 2: CrashLoopBackOff — app khởi động rồi chết, lặp lại</h2>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl get pods
+NAME                       READY   STATUS             RESTARTS      AGE
+broken-2-7f9b8d6c4-q8wzn   0/1     <span class="err">CrashLoopBackOff</span>   <span class="hl">4 (30s ago)</span>   2m</pre></div>
+    <p><code>RESTARTS</code> tăng dần là dấu hiệu chắc chắn. Lỗi nằm <strong>trong app</strong>, nên đọc log. Nhưng container hiện tại có thể vừa khởi động lại chưa kịp in gì — dùng <code>--previous</code> để đọc log của lần vừa chết:</p>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl logs broken-2-7f9b8d6c4-q8wzn --previous
+starting
+Error: environment variable DATABASE_URL is required
+
+$ kubectl describe pod broken-2-7f9b8d6c4-q8wzn
+...
+    Last State:     Terminated
+      Reason:       Error
+      Exit Code:    <span class="hl">1</span></pre></div>
+    <ul>
+      <li><strong>Nguyên nhân hay gặp:</strong> thiếu biến môi trường hoặc cấu hình; không kết nối được database; sai lệnh khởi động; app lỗi thật.</li>
+      <li><strong>Sửa:</strong> đọc log, sửa cấu hình (ConfigMap/Secret) hoặc code. Nếu log trống, xem <code>Exit Code</code> trong describe.</li>
+    </ul>
+
+    <h2>Lỗi 3: Pending — chưa được xếp lên node nào</h2>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl get pods
+NAME                       READY   STATUS    RESTARTS   AGE
+broken-3-5c7d9f8b6-t4jrw   0/1     <span class="err">Pending</span>   0          3m
+
+$ kubectl describe pod broken-3-5c7d9f8b6-t4jrw
+...
+Events:
+  Type     Reason            Age   From               Message
+  ----     ------            ----  ----               -------
+  Warning  <span class="hl">FailedScheduling</span>  3m    default-scheduler  0/1 nodes are available: 1 <span class="err">Insufficient cpu</span>. preemption: 0/1 nodes are available: 1 No preemption victims found for incoming pod.</pre></div>
+    <ul>
+      <li><strong>Đọc:</strong> <code>FailedScheduling</code> = scheduler không tìm được node phù hợp. Câu phía sau nói lý do: <code>Insufficient cpu</code>, <code>Insufficient memory</code>, hoặc liên quan ổ đĩa (PVC chưa sẵn).</li>
+      <li><strong>Sửa:</strong> giảm <code>resources.requests</code> nếu đặt quá tay, hoặc cluster cần thêm node (báo team hạ tầng).</li>
+    </ul>
+
+    <h2>Lỗi 4: OOMKilled — dùng quá RAM cho phép</h2>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl describe pod api-6b9c8d7f5-k2wqp
+...
+    State:          Running
+    Last State:     Terminated
+      Reason:       <span class="err">OOMKilled</span>
+      Exit Code:    137
+    Restart Count:  3
+    Limits:
+      memory:  128Mi</pre></div>
+    <ul>
+      <li><strong>Đọc:</strong> container bị hệ thống giết vì vượt <code>limits.memory</code>. Exit code 137 thường đi kèm.</li>
+      <li><strong>Sửa:</strong> tăng memory limit nếu app thực sự cần nhiều hơn; nếu RAM cứ tăng mãi thì app đang rò rỉ bộ nhớ.</li>
+    </ul>
+
+    <h2>Lỗi 5: Running nhưng 0/1 READY</h2>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl get pods
+NAME                   READY   STATUS    RESTARTS   AGE
+web-8d7c6b5f9-wq2lx    <span class="err">0/1</span>     Running   0          2m
+
+$ kubectl describe pod web-8d7c6b5f9-wq2lx
+...
+Events:
+  Warning  Unhealthy  5s (x12 over 2m)  kubelet  <span class="err">Readiness probe failed</span>: HTTP probe failed with statuscode: 404</pre></div>
+    <ul>
+      <li><strong>Đọc:</strong> container chạy, nhưng readiness probe thất bại nên Pod không được nhận traffic. <code>statuscode: 404</code> → đường dẫn probe sai.</li>
+      <li><strong>Sửa:</strong> kiểm tra <code>path</code> và <code>port</code> của probe có đúng với app không. Nếu app chỉ khởi động chậm, nó sẽ tự Ready sau một lúc.</li>
+    </ul>
+
+    <h2>Lỗi 6: Pod chạy tốt nhưng gọi Service không được</h2>
+    <p>Lỗi này không nằm ở Pod nên quy trình 4 bước không bắt được. Kiểm tra Service trỏ vào đâu:</p>
+    <div class="term" data-title="zsh — kind-lab / demo"><pre>$ kubectl get endpointslices -l kubernetes.io/service-name=web
+NAME        ADDRESSTYPE   PORTS     ENDPOINTS   AGE
+web-x7k2p   IPv4          &lt;unset&gt;   <span class="err">&lt;unset&gt;</span>     5m
+
+$ kubectl get service web -o jsonpath='{.spec.selector}'
+{"app":"<span class="hl">wed</span>"}         <span class="cm"># gõ nhầm "web" thành "wed"</span></pre></div>
+    <ul>
+      <li><strong>ENDPOINTS trống</strong> → selector không khớp nhãn Pod nào (so với <code>kubectl get pods --show-labels</code>), hoặc mọi Pod đều chưa Ready.</li>
+      <li><strong>ENDPOINTS có IP mà vẫn lỗi</strong> → kiểm tra <code>targetPort</code> có đúng cổng app lắng nghe không.</li>
+    </ul>
+
+    <h2>Thực hành: tự tìm lỗi</h2>
+    <p>Apply file dưới (3 Deployment, mỗi cái một lỗi), dùng quy trình 4 bước để tìm ra từng lỗi trước khi xem đáp án:</p>
+<pre data-file="bai-tap-debug.yaml"><code class="language-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broken-1
+spec:
+  selector:
+    matchLabels: { app: broken-1 }
+  template:
+    metadata:
+      labels: { app: broken-1 }
+    spec:
+      containers:
+        - name: app
+          image: nginx:1.27-typo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broken-2
+spec:
+  selector:
+    matchLabels: { app: broken-2 }
+  template:
+    metadata:
+      labels: { app: broken-2 }
+    spec:
+      containers:
+        - name: app
+          image: busybox:1.36
+          command: ["sh", "-c", "echo starting; echo 'Error: environment variable DATABASE_URL is required'; exit 1"]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broken-3
+spec:
+  selector:
+    matchLabels: { app: broken-3 }
+  template:
+    metadata:
+      labels: { app: broken-3 }
+    spec:
+      containers:
+        - name: app
+          image: nginx:1.27
+          resources:
+            requests: { cpu: "64" }</code></pre>
+    <div class="qa-list">
+      <details><summary>Đáp án broken-1</summary><p>ImagePullBackOff. describe → Events: image "nginx:1.27-typo" not found. Sửa tag thành nginx:1.27.</p></details>
+      <details><summary>Đáp án broken-2</summary><p>CrashLoopBackOff. logs --previous thấy thông báo thiếu DATABASE_URL, exit code 1. Thực tế sẽ sửa bằng cách thêm biến môi trường từ ConfigMap/Secret.</p></details>
+      <details><summary>Đáp án broken-3</summary><p>Pending. describe → FailedScheduling: Insufficient cpu — xin 64 CPU trong khi máy không có. Giảm requests, ví dụ cpu: 100m.</p></details>
+    </div>
+    <p>Dọn dẹp: <code>kubectl delete -f bai-tap-debug.yaml</code>.</p>
+
+    <div class="callout tip" data-title="Khi bí"><p>Dán nguyên output của <code>kubectl describe pod</code> và <code>kubectl logs --previous</code> cho AI. Hai thứ này gần như luôn chứa đủ manh mối để chẩn đoán. Công cụ <strong>k9s</strong> cũng giúp đi qua 4 bước này rất nhanh bằng phím tắt.</p></div>
+  </section>
+
+  <section class="lesson" id="dung-app" data-part="1 · Cốt lõi" data-title="Ghép lại: dựng một app từ số 0" data-minutes="30" data-practice="60" data-updated="2026-11-15" data-done="false" data-summary="Viết từng dòng một file YAML hoàn chỉnh cho app mới, mỗi bước apply và kiểm tra.">
+    <div class="callout note" data-title="Mục tiêu bài này">
+      <p>Tự viết từ đầu file <code>shop-api.yaml</code> cho một app mới, đi từ “chạy được” tới “sẵn sàng cho người dùng”. Mỗi bước chỉ thêm một thứ, apply, kiểm tra, rồi mới đi tiếp. Cuối bài là file hoàn chỉnh — từ đây về sau, app nào cũng làm theo đúng trình tự này.</p>
+    </div>
+    <p>Kịch bản: team giao mình đưa app <code>shop-api</code> lên Kubernetes. App lắng nghe cổng 9898, có <code>/readyz</code> để kiểm tra sẵn sàng, cần biến <code>PODINFO_UI_MESSAGE</code> (cấu hình) và <code>DB_PASSWORD</code> (bí mật). Người dùng truy cập qua <code>shop.local</code>. (Mình vẫn dùng image podinfo để đóng vai app này.)</p>
+
+    <h2>Bước 0 — Namespace riêng</h2>
+    <p>Mỗi app hoặc môi trường một namespace: dọn dẹp chỉ cần xóa namespace, và không đụng chạm thứ của người khác.</p>
+    <div class="term" data-title="zsh — kind-lab"><pre>$ kubectl create namespace shop
+namespace/shop created
+
+$ kubectl config set-context --current --namespace=shop
+Context "kind-lab" modified.</pre></div>
+
+    <h2>Bước 1 — Chạy được app: Deployment tối thiểu</h2>
+    <p>Bắt đầu bằng thứ nhỏ nhất chạy được. Chưa probe, chưa cấu hình — chỉ cần app lên:</p>
+<pre data-file="shop-api.yaml" data-add="1-17"><code class="language-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shop-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: shop-api
+  template:
+    metadata:
+      labels:
+        app: shop-api
+    spec:
+      containers:
+        - name: shop-api
+          image: ghcr.io/stefanprodan/podinfo:6.7.1</code></pre>
+    <div class="term" data-title="zsh — kind-lab / shop"><pre>$ kubectl apply -f shop-api.yaml
+deployment.apps/shop-api created
+
+$ kubectl get pods
+NAME                        READY   STATUS    RESTARTS   AGE
+shop-api-6f8d9b7c5-4xk2m    1/1     Running   0          12s
+shop-api-6f8d9b7c5-9wq7t    1/1     Running   0          12s</pre></div>
+    <p>✓ Kiểm tra: 2 Pod Running, <code>1/1</code>. Nếu không, quay lại bài Debug.</p>
+
+    <h2>Bước 2 — Cho Kubernetes biết khi nào app sẵn sàng, và cần bao nhiêu tài nguyên</h2>
+<pre data-file="shop-api.yaml" data-add="18-29"><code class="language-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shop-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: shop-api
+  template:
+    metadata:
+      labels:
+        app: shop-api
+    spec:
+      containers:
+        - name: shop-api
+          image: ghcr.io/stefanprodan/podinfo:6.7.1
+          ports:
+            - containerPort: 9898
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 9898
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              memory: 128Mi</code></pre>
+    <ul>
+      <li><code>readinessProbe</code> — để rolling update an toàn và Service chỉ gửi traffic tới Pod đã sẵn sàng (bài 4).</li>
+      <li><code>requests</code> — để scheduler xếp chỗ hợp lý. <code>limits.memory</code> — trần RAM, vượt thì bị OOMKilled thay vì làm nghẽn cả node.</li>
+    </ul>
+    <div class="term" data-title="zsh — kind-lab / shop"><pre>$ kubectl apply -f shop-api.yaml
+deployment.apps/shop-api configured
+
+$ kubectl rollout status deploy/shop-api
+deployment "shop-api" successfully rolled out</pre></div>
+    <p>✓ Kiểm tra: rollout thành công, Pod vẫn <code>1/1</code>.</p>
+
+    <h2>Bước 3 — Cấu hình và bí mật</h2>
+    <p>Tạo Secret bằng lệnh (không ghi mật khẩu vào file):</p>
+    <div class="term" data-title="zsh — kind-lab / shop"><pre>$ kubectl create secret generic shop-api-secret --from-literal=DB_PASSWORD='doi-mat-khau-nay'
+secret/shop-api-secret created</pre></div>
+    <p>Thêm ConfigMap vào <strong>đầu file</strong>, và nối cả hai vào container bằng <code>envFrom</code>:</p>
+<pre data-file="shop-api.yaml" data-add="1-7,37-41"><code class="language-yaml">apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shop-api-config
+data:
+  PODINFO_UI_MESSAGE: "Shop API - moi truong dev"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shop-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: shop-api
+  template:
+    metadata:
+      labels:
+        app: shop-api
+    spec:
+      containers:
+        - name: shop-api
+          image: ghcr.io/stefanprodan/podinfo:6.7.1
+          ports:
+            - containerPort: 9898
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 9898
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+          envFrom:
+            - configMapRef:
+                name: shop-api-config
+            - secretRef:
+                name: shop-api-secret</code></pre>
+    <div class="term" data-title="zsh — kind-lab / shop"><pre>$ kubectl apply -f shop-api.yaml
+configmap/shop-api-config created
+deployment.apps/shop-api configured
+
+$ kubectl exec deploy/shop-api -- env | grep -E 'PODINFO_UI_MESSAGE|DB_PASSWORD'
+PODINFO_UI_MESSAGE=Shop API - moi truong dev
+DB_PASSWORD=doi-mat-khau-nay</pre></div>
+    <p>✓ Kiểm tra: hai biến môi trường có mặt trong container.</p>
+
+    <h2>Bước 4 — Địa chỉ cố định: Service</h2>
+    <p>Thêm vào <strong>cuối file</strong>:</p>
+<pre data-file="shop-api.yaml (thêm vào cuối)" data-add="1-11"><code class="language-yaml">---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shop-api
+spec:
+  selector:
+    app: shop-api
+  ports:
+    - port: 80
+      targetPort: 9898</code></pre>
+    <div class="term" data-title="zsh — kind-lab / shop"><pre>$ kubectl apply -f shop-api.yaml
+configmap/shop-api-config unchanged
+deployment.apps/shop-api unchanged
+service/shop-api created
+
+$ kubectl get endpointslices -l kubernetes.io/service-name=shop-api
+NAME             ADDRESSTYPE   PORTS   ENDPOINTS                 AGE
+shop-api-8r2kd   IPv4          9898    10.244.0.31,10.244.0.32   6s</pre></div>
+    <p>✓ Kiểm tra: ENDPOINTS có đúng 2 IP — selector khớp cả 2 Pod.</p>
+
+    <h2>Bước 5 — Mở ra ngoài: Ingress</h2>
+    <p>Thêm vào cuối file (cần Traefik đã cài ở bài 7):</p>
+<pre data-file="shop-api.yaml (thêm vào cuối)" data-add="1-18"><code class="language-yaml">---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: shop-api
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: shop.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: shop-api
+                port:
+                  number: 80</code></pre>
+    <div class="term" data-title="zsh — kind-lab / shop"><pre>$ kubectl apply -f shop-api.yaml
+configmap/shop-api-config unchanged
+deployment.apps/shop-api unchanged
+service/shop-api unchanged
+ingress.networking.k8s.io/shop-api created
+
+$ curl -s -H "Host: shop.local" localhost:8000 | grep -E 'hostname|message'
+  "hostname": "shop-api-7b9c8d6f4-pq3zn",
+  "message": "Shop API - moi truong dev",</pre></div>
+    <p>✓ Kiểm tra: request đi trọn đường <strong>Ingress → Service → Pod</strong> và app đọc được cấu hình. App đã sẵn sàng.</p>
+
+    <h2>File hoàn chỉnh</h2>
+    <p>Đây là “khuôn” mình giữ lại. App mới chỉ cần thay: tên (<code>shop-api</code>), image, cổng (<code>9898</code>), đường dẫn probe, biến cấu hình và host.</p>
+<pre data-file="shop-api.yaml"><code class="language-yaml">apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shop-api-config
+data:
+  PODINFO_UI_MESSAGE: "Shop API - moi truong dev"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shop-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: shop-api
+  template:
+    metadata:
+      labels:
+        app: shop-api
+    spec:
+      containers:
+        - name: shop-api
+          image: ghcr.io/stefanprodan/podinfo:6.7.1
+          ports:
+            - containerPort: 9898
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 9898
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+          envFrom:
+            - configMapRef:
+                name: shop-api-config
+            - secretRef:
+                name: shop-api-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shop-api
+spec:
+  selector:
+    app: shop-api
+  ports:
+    - port: 80
+      targetPort: 9898
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: shop-api
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: shop.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: shop-api
+                port:
+                  number: 80</code></pre>
+
+    <h2>Thử vận hành</h2>
+    <p>Với file này, các việc hằng ngày đều là “sửa file → apply”:</p>
+    <table>
+      <thead><tr><th>Việc</th><th>Làm gì</th></tr></thead>
+      <tbody>
+        <tr><td>Ra phiên bản mới</td><td>Đổi <code>image</code>, apply, <code>kubectl rollout status deploy/shop-api</code></td></tr>
+        <tr><td>Phiên bản mới lỗi</td><td><code>kubectl rollout undo deploy/shop-api</code>, rồi sửa lại file</td></tr>
+        <tr><td>Đổi cấu hình</td><td>Sửa ConfigMap, apply, <code>kubectl rollout restart deploy/shop-api</code></td></tr>
+        <tr><td>Tăng số bản</td><td>Đổi <code>replicas</code>, apply</td></tr>
+        <tr><td>Gỡ app</td><td><code>kubectl delete -f shop-api.yaml</code> (hoặc xóa cả namespace)</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Checklist trước khi đưa app lên cluster thật</h2>
+    <ul>
+      <li>Image có tag cụ thể (<code>1.4.2</code>, commit SHA), không dùng <code>latest</code>.</li>
+      <li>Có <code>readinessProbe</code> và <code>resources.requests</code>.</li>
+      <li>Ít nhất 2 replicas cho app quan trọng.</li>
+      <li>Không có mật khẩu trong ConfigMap, trong file YAML hay trong Git.</li>
+      <li>Biết lệnh rollback: <code>kubectl rollout undo</code>.</li>
+    </ul>
+
+    <h2>Dọn dẹp</h2>
+    <div class="term" data-title="zsh — kind-lab"><pre>$ kubectl delete namespace shop
+namespace "shop" deleted</pre></div>
+    <div class="callout tip" data-title="Xong Phần 1"><p>Tới đây mình đọc hiểu và tự viết được cấu hình cho phần lớn app web trên Kubernetes. Phần 2 dành cho lúc gặp việc cụ thể: lưu dữ liệu, chạy job theo lịch, autoscale, Helm, GitOps, bảo mật, monitoring — đọc khi cần, mỗi bài có sẵn câu hỏi để hỏi AI.</p></div>
+  </section>
+
+  <!-- ===================== PHẦN 2 · TRA CỨU KHI CẦN ===================== -->
+  <!-- Mỗi bài: Dùng khi · Ý chính · Mẫu tối thiểu · Hỏi AI. Không cần học thuộc. -->
+
+  <section class="lesson" id="luu-du-lieu" data-part="2 · Tra cứu khi cần" data-title="Lưu dữ liệu: PVC và StatefulSet" data-minutes="5" data-updated="2026-11-15" data-done="false" data-summary="Khi app cần ổ đĩa sống lâu hơn Pod.">
+    <div class="callout note" data-title="Dùng khi"><p>App ghi dữ liệu cần giữ lại sau khi Pod chết: database, file upload. App stateless (API, web) thì không cần bài này.</p></div>
+
+    <h2>Ý chính</h2>
+    <ul>
+      <li>App xin ổ đĩa bằng <strong>PersistentVolumeClaim (PVC)</strong> — “cần 5Gi”. Cluster tự cấp ổ thật (PV) theo <strong>StorageClass</strong>.</li>
+      <li>Ổ phổ biến là <code>ReadWriteOnce</code>: chỉ gắn vào một node một lúc.</li>
+      <li>Nhiều bản cần ổ riêng từng bản (cluster DB, Kafka) → <strong>StatefulSet</strong>: Pod có tên cố định <code>db-0</code>, <code>db-1</code> và PVC riêng.</li>
+      <li>Database production thường dùng dịch vụ managed của cloud hoặc Operator, không tự viết StatefulSet.</li>
+    </ul>
+
+    <h2>Mẫu tối thiểu</h2>
+<pre><code class="language-yaml">apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: data }
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources: { requests: { storage: 2Gi } }
+---
+# trong Deployment/StatefulSet:
+#   containers[].volumeMounts: [{ name: data, mountPath: /var/lib/data }]
+#   volumes: [{ name: data, persistentVolumeClaim: { claimName: data } }]</code></pre>
+    <div class="callout warning"><p>Nhiều StorageClass có <code>reclaimPolicy: Delete</code>: xóa PVC là mất dữ liệu. Luôn có backup riêng.</p></div>
+
+    <h2>Hỏi AI</h2>
+    <ul>
+      <li>“Viết StatefulSet PostgreSQL 1 replica có PVC 10Gi, mật khẩu lấy từ Secret.”</li>
+      <li>“Khác nhau giữa ReadWriteOnce và ReadWriteMany, storage nào trên AWS hỗ trợ RWX?”</li>
+    </ul>
+  </section>
+
+  <section class="lesson" id="job-cronjob" data-part="2 · Tra cứu khi cần" data-title="Job, CronJob và DaemonSet" data-minutes="4" data-updated="2026-11-15" data-done="false" data-summary="Tác vụ chạy một lần, chạy theo lịch, hoặc chạy trên mọi node.">
+    <div class="callout note" data-title="Dùng khi">
+      <ul>
+        <li><strong>Job</strong> — chạy một lần tới khi xong: migration DB, xử lý dữ liệu.</li>
+        <li><strong>CronJob</strong> — Job theo lịch: backup hằng đêm, gửi báo cáo.</li>
+        <li><strong>DaemonSet</strong> — một Pod trên mỗi node: agent log, agent monitoring.</li>
+      </ul>
+    </div>
+
+    <h2>Mẫu tối thiểu: CronJob</h2>
+<pre><code class="language-yaml">apiVersion: batch/v1
+kind: CronJob
+metadata: { name: nightly-backup }
+spec:
+  schedule: "0 2 * * *"            # 02:00 mỗi ngày (cú pháp cron)
+  timeZone: "Asia/Ho_Chi_Minh"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: backup
+              image: busybox:1.36
+              command: ["sh", "-c", "echo backup xong"]</code></pre>
+<pre><code class="language-bash">kubectl create job --from=cronjob/nightly-backup chay-thu   # chạy ngay, không chờ lịch
+kubectl logs job/chay-thu</code></pre>
+
+    <h2>Hỏi AI</h2>
+    <ul>
+      <li>“Viết Job chạy migration với image X trước khi Deployment khởi động, thử lại tối đa 3 lần.”</li>
+      <li>“Cú pháp cron cho 8 giờ sáng thứ 2 đến thứ 6.”</li>
+    </ul>
+  </section>
+
+  <section class="lesson" id="resources-hpa" data-part="2 · Tra cứu khi cần" data-title="Resource và autoscaling" data-minutes="5" data-updated="2026-11-15" data-done="false" data-summary="Requests, limits và để HPA tự tăng giảm số Pod.">
+    <div class="callout note" data-title="Dùng khi"><p>Pod bị OOMKilled, node quá tải, hoặc muốn số Pod tự tăng khi đông người dùng.</p></div>
+
+    <h2>Ý chính</h2>
+    <ul>
+      <li><code>requests</code> — phần được đảm bảo, scheduler dùng để xếp Pod. <code>limits</code> — trần.</li>
+      <li>Vượt <strong>memory</strong> limit → container bị giết (OOMKilled). Vượt <strong>CPU</strong> limit → chỉ bị chạy chậm lại.</li>
+      <li><strong>HPA</strong> tăng giảm replicas theo % CPU so với requests. Cần metrics-server (cloud thường có sẵn).</li>
+      <li>Xem mức dùng thực tế: <code>kubectl top pods</code>.</li>
+    </ul>
+
+    <h2>Mẫu tối thiểu: HPA</h2>
+<pre><code class="language-yaml">apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: api }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: api }
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }</code></pre>
+    <div class="callout tip"><p>Deployment không khai CPU requests thì HPA theo CPU không chạy được.</p></div>
+
+    <h2>Hỏi AI</h2>
+    <ul>
+      <li>“Pod của tôi dùng khoảng 300Mi RAM, đỉnh 450Mi — nên đặt requests/limits thế nào?”</li>
+      <li>“Cài metrics-server trên kind.” · “KEDA scale theo độ dài hàng đợi RabbitMQ.”</li>
+    </ul>
+  </section>
+
+  <section class="lesson" id="trien-khai" data-part="2 · Tra cứu khi cần" data-title="Đóng gói và triển khai: Helm, Kustomize, GitOps" data-minutes="7" data-updated="2026-11-15" data-done="false" data-summary="Quản lý YAML cho nhiều môi trường và tự động deploy từ Git.">
+    <div class="callout note" data-title="Dùng khi"><p>Cùng một app chạy ở dev/staging/prod, hoặc team muốn deploy bằng pull request thay vì chạy kubectl tay.</p></div>
+
+    <h2>Ý chính</h2>
+    <table>
+      <thead><tr><th>Công cụ</th><th>Là gì</th><th>Gặp ở đâu</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Helm</strong></td><td>“Package manager”: chart = template YAML + <code>values.yaml</code>.</td><td>Cài phần mềm có sẵn (Redis, Prometheus…), chart nội bộ của công ty.</td></tr>
+        <tr><td><strong>Kustomize</strong></td><td>YAML gốc (base) + lớp vá cho từng môi trường (overlay). Có sẵn trong kubectl.</td><td>App nội bộ ít khác biệt giữa môi trường.</td></tr>
+        <tr><td><strong>Argo CD / Flux</strong></td><td>GitOps: agent trong cluster tự đồng bộ cluster theo repo Git.</td><td>Hầu hết công ty dùng k8s nghiêm túc.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Lệnh Helm hay dùng</h2>
+<pre><code class="language-bash">helm repo add podinfo https://stefanprodan.github.io/podinfo
+helm install demo podinfo/podinfo -n demo --create-namespace -f values.yaml
+helm upgrade demo podinfo/podinfo -n demo -f values.yaml
+helm list -n demo
+helm rollback demo 1 -n demo
+helm template demo podinfo/podinfo -f values.yaml     # xem YAML sinh ra, không cài</code></pre>
+
+    <h2>Luồng GitOps điển hình</h2>
+<pre><code class="language-text">push code ─► CI build image (tag = commit SHA) ─► cập nhật tag trong repo cấu hình
+                                                         │
+                                       Argo CD thấy thay đổi ─► đồng bộ cluster</code></pre>
+    <p>Rollback = revert commit trong repo cấu hình. Sửa tay trên cluster sẽ bị Argo CD đưa về như Git.</p>
+
+    <h2>Hỏi AI</h2>
+    <ul>
+      <li>“Chuyển file app.yaml của tôi thành Helm chart có values cho image, replicas, host.”</li>
+      <li>“Cấu trúc Kustomize base + overlay dev/prod, prod 3 replicas và tag image khác.”</li>
+      <li>“Viết Argo CD Application trỏ tới repo X, thư mục overlays/prod, bật auto sync.”</li>
+      <li>“GitHub Actions build Docker image và push lên ghcr.io với tag commit SHA.”</li>
+    </ul>
+  </section>
+
+  <section class="lesson" id="bao-mat" data-part="2 · Tra cứu khi cần" data-title="Bảo mật: RBAC, NetworkPolicy, securityContext" data-minutes="6" data-updated="2026-11-15" data-done="false" data-summary="Ai được làm gì với cluster, Pod được gọi tới đâu, container chạy với quyền gì.">
+    <div class="callout note" data-title="Dùng khi"><p>Bị báo <code>Forbidden</code> khi chạy kubectl, cần cấp quyền cho app/CI, hoặc team yêu cầu siết bảo mật.</p></div>
+
+    <h2>Ý chính</h2>
+    <ul>
+      <li><strong>RBAC</strong>: <code>Role</code> liệt kê quyền (verbs trên resources) → <code>RoleBinding</code> gán cho user hoặc <strong>ServiceAccount</strong> (danh tính của Pod). Bản cấp cluster: <code>ClusterRole</code>/<code>ClusterRoleBinding</code>.</li>
+      <li><strong>NetworkPolicy</strong>: mặc định mọi Pod gọi được nhau. NetworkPolicy giới hạn ai được gọi ai (ví dụ: chỉ api được gọi database).</li>
+      <li><strong>securityContext</strong>: không chạy bằng root, filesystem chỉ đọc, bỏ bớt capability.</li>
+      <li>Nguyên tắc: quyền tối thiểu. Không bao giờ gán <code>cluster-admin</code> cho app.</li>
+    </ul>
+
+    <h2>Lệnh đáng nhớ</h2>
+<pre><code class="language-bash">kubectl auth can-i delete pods -n shop                 # tôi có quyền không?
+kubectl auth can-i list secrets -n shop \
+  --as=system:serviceaccount:shop:api                  # ServiceAccount api có quyền không?</code></pre>
+
+    <h2>Mẫu tối thiểu: securityContext</h2>
+<pre><code class="language-yaml">securityContext:              # đặt trong container
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: { drop: ["ALL"] }</code></pre>
+
+    <h2>Hỏi AI</h2>
+    <ul>
+      <li>“Viết Role + RoleBinding cho ServiceAccount ci-deployer được apply Deployment trong namespace shop.”</li>
+      <li>“NetworkPolicy chỉ cho Pod app=api kết nối Pod app=postgres cổng 5432.”</li>
+    </ul>
+  </section>
+
+  <section class="lesson" id="monitoring" data-part="2 · Tra cứu khi cần" data-title="Monitoring và log" data-minutes="5" data-updated="2026-11-15" data-done="false" data-summary="Biết hệ thống có khỏe không và chuyện gì đã xảy ra.">
+    <div class="callout note" data-title="Dùng khi"><p>Cần dashboard, cảnh báo khi có sự cố, hoặc tìm log của Pod đã bị xóa.</p></div>
+
+    <h2>Ý chính</h2>
+    <table>
+      <thead><tr><th>Nhu cầu</th><th>Bộ công cụ phổ biến</th></tr></thead>
+      <tbody>
+        <tr><td>Metric + dashboard + cảnh báo</td><td><strong>Prometheus + Grafana + Alertmanager</strong> (cài cả bộ bằng chart <code>kube-prometheus-stack</code>)</td></tr>
+        <tr><td>Log tập trung</td><td>Fluent Bit / Grafana Alloy thu log → <strong>Loki</strong> hoặc Elasticsearch</td></tr>
+        <tr><td>Trace một request qua nhiều service</td><td><strong>OpenTelemetry</strong> → Tempo / Jaeger</td></tr>
+      </tbody>
+    </table>
+    <ul>
+      <li><code>kubectl logs</code> mất khi Pod bị xóa — production luôn cần log tập trung.</li>
+      <li>App nên ghi log ra stdout, dạng JSON, và mở <code>/metrics</code> cho Prometheus.</li>
+    </ul>
+
+    <h2>Hỏi AI</h2>
+    <ul>
+      <li>“PromQL: CPU từng Pod trong namespace shop trong 5 phút qua.”</li>
+      <li>“Viết ServiceMonitor cho Service api cổng http, path /metrics.”</li>
+      <li>“Cảnh báo khi Pod restart quá 3 lần trong 1 giờ.”</li>
+    </ul>
+    <div class="callout tip"><p>Muốn đi xa hơn với Kubernetes: chứng chỉ <strong>CKAD</strong> (cho developer) là đích hợp lý — nó kiểm tra đúng những gì Phần 1 dạy, cộng một phần Phần 2.</p></div>
   </section>
 
 </main>
