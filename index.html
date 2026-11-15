@@ -7,9 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="assets/style.css?v=20261115">
-<script src="assets/common.js?v=20261115"></script>
-<script src="assets/data.js?v=20261115"></script>
+<link rel="stylesheet" href="assets/style.css?v=20261115-2">
+<script src="assets/common.js?v=20261115-2"></script>
+<script src="assets/data.js?v=20261115-2"></script>
 </head>
 <body>
   <header class="site-header narrow">
@@ -41,8 +41,16 @@
       </div>
 
       <div class="panel heat">
-        <div class="panel-head"><strong>Lịch học 26 tuần qua</strong><span id="heat-summary"></span></div>
-        <div class="heat-scroll"><div class="heat-grid" id="heatmap" role="img" aria-label="Biểu đồ nhiệt thời gian học theo ngày"></div></div>
+        <div class="panel-head">
+          <strong id="heat-title">Lịch học</strong>
+          <div class="seg" role="group" aria-label="Khoảng thời gian">
+            <button type="button" data-range="week">Tuần</button>
+            <button type="button" data-range="month">Tháng</button>
+            <button type="button" data-range="6m">6 tháng</button>
+          </div>
+        </div>
+        <div class="heat-summary" id="heat-summary"></div>
+        <div id="heat-view" role="img" aria-label="Biểu đồ nhiệt thời gian học theo ngày"></div>
         <div class="heat-legend" aria-hidden="true">
           <span>0g</span><i></i><i style="background:var(--h1)"></i><i style="background:var(--h2)"></i><i style="background:var(--h3)"></i><i style="background:var(--h4)"></i><span>3g+</span>
           <span style="margin-left:12px;display:flex;align-items:center;gap:5px"><i style="background:transparent;box-shadow:inset 0 0 0 1.5px var(--text)"></i>hôm nay</span>
@@ -68,6 +76,6 @@
 
   <footer class="site-footer"><div class="inner" id="footer">Learning hub</div></footer>
 
-  <script src="assets/portal.js?v=20261115"></script>
+  <script src="assets/portal.js?v=20261115-2"></script>
 </body>
 </html>
