@@ -9,6 +9,7 @@
   --plan-soft: #EEF0F3; --bar: #E3E7EC;
   --h0: #EBEEF2; --h1: #C5D7F4; --h2: #8DB0EA; --h3: #4A7FD4; --h4: #1F5FBF;
   --c-key: #0A5BA8; --c-str: #1A7F45; --c-num: #A0410D; --c-com: #5F6B78; --c-kw: #7B3FB0; --c-fn: #8A4B00;
+  --logo-moon: #F4E6C4; --logo-ink: #1F2328; --logo-gold: #B8862B;
   --font: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
   --mono: "JetBrains Mono", SFMono-Regular, Menlo, Consolas, monospace;
   color-scheme: light;
@@ -21,6 +22,7 @@
   --warn: #F2C26B; --warn-soft: #2A2010; --warn-line: #5A4319;
   --plan-soft: #222932; --bar: #27303A;
   --h0: #202730; --h1: #1E3355; --h2: #2C4F8A; --h3: #4A79C8; --h4: #7EA8F2;
+  --logo-moon: #3B311F; --logo-ink: #ECE8DF; --logo-gold: #DCAB4C;
   --c-key: #8CB8F5; --c-str: #7FD4A0; --c-num: #F0A270; --c-com: #8B96A3; --c-kw: #C9A3F5; --c-fn: #F2C26B;
   color-scheme: dark;
 }
@@ -46,7 +48,9 @@ button { font: inherit; color: inherit; }
 .site-header.narrow .inner { max-width: 1200px; margin: 0 auto; }
 .brand { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; font-weight: 600; font-size: 17px; letter-spacing: -0.01em; }
 .brand:hover { color: var(--text); }
-.brand-mark { width: 30px; height: 30px; border-radius: 7px; background: var(--accent); color: var(--on-accent); display: flex; align-items: center; justify-content: center; }
+.brand-mark { width: 32px; height: 32px; display: flex; flex: none; }
+.brand-mark .logo { width: 100%; height: 100%; display: block; }
+.logo .lg-s { fill: var(--logo-moon); } .logo .lg-i { fill: var(--logo-ink); } .logo .lg-g { fill: var(--logo-gold); }
 .icon-btn { width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--muted); display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .icon-btn:hover { background: var(--hover); color: var(--text); }
 

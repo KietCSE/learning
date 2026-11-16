@@ -44,7 +44,7 @@
     var shell = document.createElement("div");
     shell.innerHTML =
       '<header class="site-header"><div class="inner">' +
-        '<a class="brand" href="../index.html"><span class="brand-mark"><svg class="icon" style="width:17px;height:17px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></span>Learning hub</a>' +
+        '<a class="brand" href="../index.html"><span class="brand-mark"><svg class="logo" viewBox="0 0 48 48" aria-hidden="true"><circle class="lg-s" cx="24" cy="25" r="22"/><circle class="lg-i" cx="24" cy="5.5" r="1.6"/><rect class="lg-i" x="23.1" y="6" width="1.8" height="5"/><path class="lg-i" d="M8 17.5C14 17.5 18 14.5 20 10.5H28C30 14.5 34 17.5 40 17.5C36 19 32.5 19 30 18.6H18C15.5 19 12 19 8 17.5Z"/><rect class="lg-i" x="18.5" y="19.6" width="11" height="4.6"/><path class="lg-i" d="M4.5 29.5C11 29.5 15 26.5 17 23H31C33 26.5 37 29.5 43.5 29.5C39.5 31 35.5 31 33 30.6H15C12.5 31 8.5 31 4.5 29.5Z"/><rect class="lg-i" x="15" y="31.6" width="18" height="7.6"/><path class="lg-g" d="M21.6 39.2V35.6a2.4 2.4 0 0 1 4.8 0V39.2Z"/><rect class="lg-i" x="11" y="39.2" width="26" height="2.6" rx="1"/></svg></span>Learning hub</a>' +
         '<button type="button" class="icon-btn" data-theme-toggle></button>' +
       "</div></header>" +
       '<div class="subbar"><div class="inner">' +
