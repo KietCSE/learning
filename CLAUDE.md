@@ -26,7 +26,8 @@ Không dùng `fetch()` (bị chặn trên `file://`): dữ liệu nằm trong `w
 - Kiệt tự bấm **"Đánh dấu đã học"** cuối mỗi bài: lưu trong localStorage của trình duyệt (`lh-done:<topicId>` = danh sách id bài, `lh-progress:<topicId>` = số bài cho portal). Chỉ có trên trình duyệt đó, không đồng bộ.
 - Khi Kiệt nhờ ghi cố định (để mọi thiết bị đều thấy): đặt `data-done="true"` trên section **và** tăng `done` của topic trong `data.js` (hai chỗ phải khớp).
 - Thêm bài: thêm section và tăng `lessons` trong `data.js`.
-- Ghi giờ học: thêm/cập nhật `studyLog["YYYY-MM-DD"] = <số phút>` trong `data.js`. Mục tiêu mặc định 120 phút/ngày.
+- Giờ học trên trình duyệt: trang bài học tự đếm (tab đang hiện + có thao tác trong 5 phút), portal có ô sửa số phút hôm nay. Lưu ở localStorage `lh-study-sec` = `{ "YYYY-MM-DD": số giây }`.
+- Giờ học cố định (mọi thiết bị đều thấy): Kiệt nhờ thì thêm `studyLog["YYYY-MM-DD"] = <số phút>` trong `data.js`. Portal lấy **giá trị lớn hơn** giữa hai nguồn cho mỗi ngày. Mục tiêu mặc định 120 phút/ngày.
 
 ## Cache
 

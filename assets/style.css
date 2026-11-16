@@ -86,6 +86,12 @@ button { font: inherit; color: inherit; }
 .goal-stats b { display: block; font-size: 20px; font-weight: 700; }
 .goal-stats span { display: block; font-size: 12px; color: var(--muted); line-height: 1.35; }
 
+.goal-edit { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+.goal-edit input { width: 72px; height: 32px; padding: 0 8px; border: 1px solid var(--line2); border-radius: 6px; background: var(--card); color: var(--text); font: inherit; font-size: 14px; }
+.goal-edit input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.goal-edit button { height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent); font-weight: 600; font-size: 13px; cursor: pointer; }
+.goal-edit button:hover { filter: brightness(1.08); }
+.goal-note { margin: -6px 0 0; font-size: 12px; color: var(--muted); line-height: 1.4; }
 .heat { flex: 999 1 560px; }
 .seg { display: inline-flex; padding: 2px; gap: 2px; background: var(--alt); border: 1px solid var(--line); border-radius: 8px; }
 .seg button { border: 0; background: transparent; height: 28px; padding: 0 12px; border-radius: 6px; font-size: 13px; color: var(--muted); cursor: pointer; }

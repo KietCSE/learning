@@ -312,5 +312,15 @@
     }
     window.addEventListener("hashchange", function () { route(false); });
     route(true);
+
+    /* ---------- tự đếm giờ học ----------
+       Cứ 15 giây cộng 15 giây vào hôm nay, nếu: tab đang hiện và có thao tác trong 5 phút gần nhất. */
+    var TICK = 15, IDLE = 5 * 60 * 1000, lastActive = Date.now();
+    ["scroll", "mousemove", "keydown", "click", "touchstart"].forEach(function (ev) {
+      window.addEventListener(ev, function () { lastActive = Date.now(); }, { passive: true });
+    });
+    setInterval(function () {
+      if (document.visibilityState === "visible" && Date.now() - lastActive < IDLE) LH.study.add(TICK);
+    }, TICK * 1000);
   });
 })();

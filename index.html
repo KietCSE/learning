@@ -7,9 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="assets/style.css?v=20261116-6">
-<script src="assets/common.js?v=20261116-6"></script>
-<script src="assets/data.js?v=20261116-6"></script>
+<link rel="stylesheet" href="assets/style.css?v=20261116-7">
+<script src="assets/common.js?v=20261116-7"></script>
+<script src="assets/data.js?v=20261116-7"></script>
 </head>
 <body>
   <header class="site-header narrow">
@@ -38,6 +38,13 @@
           <div><b id="goal30">0/30</b><span>ngày đạt trong 30 ngày qua</span></div>
           <div><b id="month-hours">0g</b><span id="month-label">đã học trong tháng này</span></div>
         </div>
+        <div class="goal-edit">
+          <label for="today-edit">Hôm nay đã học</label>
+          <input type="number" id="today-edit" min="0" max="1440" step="5" inputmode="numeric" placeholder="0">
+          <span>phút</span>
+          <button type="button" id="today-save">Lưu</button>
+        </div>
+        <p class="goal-note">Tự đếm khi đang mở bài học. Sửa số trên nếu học thêm ngoài site. Lưu trên trình duyệt này.</p>
       </div>
 
       <div class="panel heat">
@@ -76,6 +83,6 @@
 
   <footer class="site-footer"><div class="inner" id="footer">Learning hub</div></footer>
 
-  <script src="assets/portal.js?v=20261116-6"></script>
+  <script src="assets/portal.js?v=20261116-7"></script>
 </body>
 </html>

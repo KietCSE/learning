@@ -76,5 +76,26 @@
     setTimeout(updateThemeButtons, 0);
   });
 
-  window.LH = { ICONS: ICONS, fmtMinutes: fmtMinutes, isoDate: isoDate, viDate: viDate, esc: esc, refreshTheme: updateThemeButtons };
+  /* ---- giờ học lưu trên trình duyệt: { "YYYY-MM-DD": số giây } ---- */
+  var STUDY_KEY = "lh-study-sec";
+  var study = {
+    all: function () {
+      try { return JSON.parse(localStorage.getItem(STUDY_KEY)) || {}; } catch (e) { return {}; }
+    },
+    save: function (obj) {
+      try { localStorage.setItem(STUDY_KEY, JSON.stringify(obj)); } catch (e) {}
+    },
+    add: function (seconds) {
+      var o = study.all(), k = isoDate(new Date());
+      o[k] = (o[k] || 0) + seconds;
+      study.save(o);
+    },
+    setMinutes: function (dateIso, minutes) {
+      var o = study.all();
+      if (minutes > 0) o[dateIso] = Math.round(minutes * 60); else delete o[dateIso];
+      study.save(o);
+    }
+  };
+
+  window.LH = { ICONS: ICONS, study: study, fmtMinutes: fmtMinutes, isoDate: isoDate, viDate: viDate, esc: esc, refreshTheme: updateThemeButtons };
 })();

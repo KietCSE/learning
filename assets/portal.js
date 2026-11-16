@@ -9,7 +9,12 @@
   var STATUS = { learning: "Đang học", done: "Hoàn thành", planned: "Dự định" };
 
   var today = new Date(); today.setHours(0, 0, 0, 0);
-  function minutesOn(d) { return Number(log[LH.isoDate(d)]) || 0; }
+  // Giờ học = lớn hơn giữa số ghi trong data.js và số đếm/nhập trên trình duyệt này.
+  var localSec = LH.study.all();
+  function minutesOn(d) {
+    var k = LH.isoDate(d);
+    return Math.max(Number(log[k]) || 0, Math.floor((localSec[k] || 0) / 60));
+  }
   function addDays(d, n) { var x = new Date(d); x.setDate(x.getDate() + n); return x; }
   function $(id) { return document.getElementById(id); }
 
@@ -25,6 +30,16 @@
   $("today-time").textContent = LH.fmtMinutes(todayMin);
   $("today-of").textContent = "/ " + LH.fmtMinutes(GOAL) + " hôm nay";
   $("today-bar").style.width = Math.min(100, Math.round(todayMin / GOAL * 100)) + "%";
+
+  // Sửa tay số phút hôm nay (thời gian học ngoài site: gõ lệnh, xem video…)
+  var editInput = $("today-edit");
+  editInput.value = todayMin || "";
+  $("today-save").addEventListener("click", function () {
+    var v = parseInt(editInput.value, 10);
+    LH.study.setMinutes(LH.isoDate(today), isNaN(v) ? 0 : Math.max(0, Math.min(v, 24 * 60)));
+    location.reload();
+  });
+  editInput.addEventListener("keydown", function (e) { if (e.key === "Enter") $("today-save").click(); });
 
   var streak = 0;
   for (var d = addDays(today, -1); minutesOn(d) >= GOAL; d = addDays(d, -1)) streak++;
