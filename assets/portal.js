@@ -121,7 +121,10 @@
   $("topic-count").textContent = topics.length + " topic · chọn một topic để đọc bài.";
 
   function card(t) {
-    var total = t.lessons || 0, done = Math.min(t.done || 0, total);
+    var total = t.lessons || 0, done = t.done || 0;
+    // Tiến độ đánh dấu trên trình duyệt (trang topic ghi vào đây) — đã gồm cả bài đánh dấu trong file.
+    try { var local = localStorage.getItem("lh-progress:" + t.id); if (local !== null) done = Math.max(done, +local); } catch (e) {}
+    done = Math.min(done, total);
     var pct = total ? Math.round(done / total * 100) : 0;
     var tag = t.file ? "a" : "div";
     var href = t.file ? ' href="' + LH.esc(t.file) + '"' : "";

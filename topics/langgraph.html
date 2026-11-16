@@ -1,0 +1,2296 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LangGraph</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../assets/style.css?v=20261116-6">
+<script src="../assets/common.js?v=20261116-6"></script>
+<script src="../assets/data.js?v=20261116-6"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="../assets/topic.js?v=20261116-6"></script>
+</head>
+<body data-topic="langgraph">
+<main id="lessons">
+  <!-- ===================== PHẦN 1 · CỐT LÕI (80/20) ===================== -->
+
+  <section class="lesson" id="langgraph-la-gi" data-part="1 · Cốt lõi" data-title="LangGraph là gì và vì sao cần nó" data-minutes="12" data-practice="0" data-updated="2026-11-15" data-done="false" data-summary="Từ một lần gọi LLM tới agent: vấn đề LangGraph giải quyết và 3 khái niệm State, Node, Edge.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><strong>LangGraph</strong> là thư viện Python để dựng ứng dụng LLM có <strong>nhiều bước</strong>, <strong>rẽ nhánh</strong>, <strong>lặp</strong>, <strong>nhớ</strong> và <strong>dừng chờ người duyệt</strong>.</li>
+        <li>Mọi thứ được mô tả bằng một <strong>graph</strong>: <strong>State</strong> (dữ liệu chung) đi qua các <strong>Node</strong> (hàm Python) theo các <strong>Edge</strong> (mũi tên).</li>
+        <li>Agent thực chất chỉ là một graph có <strong>vòng lặp</strong>: LLM → gọi tool → LLM → … cho tới khi xong.</li>
+      </ul>
+    </div>
+
+    <h2>Bắt đầu từ thứ đã biết: gọi LLM một lần</h2>
+    <p>Cách đơn giản nhất để dùng LLM: gửi câu hỏi, nhận câu trả lời.</p>
+<pre><code class="language-python">tra_loi = llm.invoke("Đơn DH001 của mình tới đâu rồi?")</code></pre>
+    <p>Với câu hỏi kiến thức chung thì ổn. Nhưng thử làm một <strong>trợ lý chăm sóc khách hàng</strong> cho shop thật, sẽ gặp ngay các vấn đề:</p>
+    <ul>
+      <li><strong>LLM không biết dữ liệu của mình.</strong> Muốn trả lời đơn DH001 tới đâu, nó phải <em>gọi hàm</em> tra cứu database, đọc kết quả, rồi mới trả lời. Đó là ít nhất hai lần gọi LLM với một bước chạy code ở giữa.</li>
+      <li><strong>Không biết trước cần bao nhiêu bước.</strong> Có câu hỏi trả lời ngay được; có câu phải tra cứu đơn, rồi tra cứu chính sách đổi trả, rồi mới trả lời. Cần một <em>vòng lặp</em> để LLM tự quyết khi nào xong.</li>
+      <li><strong>Phải nhớ cuộc trò chuyện.</strong> Khách hỏi tiếp “thế còn đơn kia?” — app phải biết “đơn kia” là gì.</li>
+      <li><strong>Có việc không được để AI tự làm.</strong> Hoàn 350.000đ cho khách thì phải có nhân viên duyệt. App phải <em>dừng lại</em>, chờ người bấm nút, rồi chạy tiếp — có khi vài tiếng sau.</li>
+      <li><strong>Người dùng muốn thấy tiến trình</strong> thay vì nhìn màn hình trắng 20 giây.</li>
+    </ul>
+    <p>Tự viết bằng <code>while</code> và <code>if</code> thì được, nhưng code nhanh chóng rối: trạng thái nằm rải rác, khó lưu lại để chạy tiếp, khó debug. LangGraph cho một cách tổ chức chuẩn cho đúng những việc này.</p>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 230" role="img" aria-label="So sánh gọi LLM một lần và vòng lặp agent"><defs><marker id="lg1h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="lg1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="zone" x="8" y="8" width="300" height="214" rx="12"/><text x="24" y="32" class="b">Gọi LLM một lần</text>
+<rect class="box" x="28" y="60" width="110" height="46" rx="8"/><text x="83" y="88" text-anchor="middle">câu hỏi</text>
+<rect class="acc" x="176" y="60" width="110" height="46" rx="8"/><text x="231" y="88" text-anchor="middle" class="b">LLM</text>
+<rect class="ok" x="176" y="150" width="110" height="46" rx="8"/><text x="231" y="178" text-anchor="middle">câu trả lời</text>
+<path class="ln" d="M138,83 H172" marker-end="url(#lg1h)"/><path class="ln" d="M231,106 V146" marker-end="url(#lg1h)"/>
+<text x="24" y="210" class="s">một chiều, không dữ liệu riêng, không nhớ</text>
+<rect class="zone" x="330" y="8" width="382" height="214" rx="12"/><text x="346" y="32" class="b">Agent: graph có vòng lặp</text>
+<rect class="box" x="350" y="60" width="96" height="46" rx="8"/><text x="398" y="88" text-anchor="middle">câu hỏi</text>
+<rect class="acc" x="486" y="60" width="96" height="46" rx="8"/><text x="534" y="88" text-anchor="middle" class="b">LLM</text>
+<rect class="warn" x="606" y="140" width="92" height="46" rx="8"/><text x="652" y="162" text-anchor="middle" class="b">tool</text><text x="652" y="178" text-anchor="middle" class="s">tra cứu DB</text>
+<rect class="ok" x="486" y="150" width="96" height="46" rx="8"/><text x="534" y="178" text-anchor="middle">trả lời</text>
+<path class="ln" d="M446,83 H482" marker-end="url(#lg1h)"/>
+<path class="ln-a" d="M582,76 C640,76 660,100 656,136" marker-end="url(#lg1a)"/><text x="664" y="98" class="s a">gọi tool</text>
+<path class="ln-a" d="M610,152 C590,130 588,112 578,108" marker-end="url(#lg1a)"/><text x="592" y="132" class="s a">kết quả</text>
+<path class="ln" d="M534,106 V146" marker-end="url(#lg1h)"/><text x="528" y="132" class="s" text-anchor="end">xong</text>
+<text x="346" y="210" class="s">LLM tự quyết: gọi thêm tool hay trả lời luôn</text>
+</svg><figcaption>Ứng dụng LLM thật hiếm khi là một lần gọi. Phần lớn là vòng lặp: LLM nghĩ → gọi tool → đọc kết quả → nghĩ tiếp.</figcaption></figure>
+
+    <h2>Ý tưởng cốt lõi: phiếu công việc chuyền qua các bàn</h2>
+    <p>Mình hình dung LangGraph như <strong>một văn phòng xử lý hồ sơ</strong>:</p>
+    <ul>
+      <li>Có một <strong>phiếu công việc</strong> chuyền tay giữa các bàn. Trên phiếu ghi mọi thứ đã biết: câu hỏi của khách, kết quả tra cứu, câu trả lời nháp… Đó là <strong>State</strong>.</li>
+      <li>Mỗi <strong>bàn</strong> làm một việc: đọc phiếu, làm phần của mình, ghi thêm vào phiếu. Đó là <strong>Node</strong> — một hàm Python bình thường.</li>
+      <li><strong>Mũi tên</strong> chỉ phiếu đi tiếp tới bàn nào. Có mũi tên cố định (“xong bàn A thì sang bàn B”), có mũi tên rẽ nhánh (“nếu là yêu cầu hoàn tiền thì sang bàn kế toán”). Đó là <strong>Edge</strong>.</li>
+    </ul>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 220" role="img" aria-label="State đi qua các node theo edge"><defs><marker id="lg2h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="lg2a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="box" x="10" y="26" width="76" height="38" rx="19"/><text x="48" y="50" text-anchor="middle" class="m">START</text>
+<rect class="acc" x="130" y="18" width="150" height="54" rx="8"/><text x="205" y="41" text-anchor="middle" class="b">node: phân loại</text><text x="205" y="59" text-anchor="middle" class="s">hàm Python</text>
+<rect class="acc" x="330" y="18" width="150" height="54" rx="8"/><text x="405" y="41" text-anchor="middle" class="b">node: trả lời</text><text x="405" y="59" text-anchor="middle" class="s">hàm Python</text>
+<rect class="box" x="530" y="26" width="76" height="38" rx="19"/><text x="568" y="50" text-anchor="middle" class="m">END</text>
+<path class="ln" d="M86,45 H126" marker-end="url(#lg2h)"/><path class="ln" d="M280,45 H326" marker-end="url(#lg2h)"/><path class="ln" d="M480,45 H526" marker-end="url(#lg2h)"/>
+<text x="303" y="36" class="s" text-anchor="middle">edge</text>
+<rect class="ok" x="70" y="120" width="190" height="84" rx="8"/><text x="84" y="142" class="b">State (lúc vào)</text><text x="84" y="164" class="s m">cau_hoi: "Đơn DH001…"</text><text x="84" y="182" class="s m">loai: —</text>
+<rect class="ok" x="300" y="120" width="190" height="84" rx="8"/><text x="314" y="142" class="b">State (sau phân loại)</text><text x="314" y="164" class="s m">cau_hoi: "Đơn DH001…"</text><text x="314" y="182" class="s m">loai: "don_hang"</text>
+<rect class="ok" x="530" y="120" width="182" height="84" rx="8"/><text x="544" y="142" class="b">State (cuối)</text><text x="544" y="164" class="s m">loai: "don_hang"</text><text x="544" y="182" class="s m">tra_loi: "Đơn đang…"</text>
+<path class="ln-a dash" d="M205,72 V116" marker-end="url(#lg2a)"/><path class="ln-a dash" d="M405,72 V116" marker-end="url(#lg2a)"/><path class="ln-a dash" d="M600,64 V116" marker-end="url(#lg2a)"/>
+</svg><figcaption>State là “phiếu công việc” đi qua từng node. Mỗi node đọc phiếu và ghi thêm phần của mình.</figcaption></figure>
+    <p>Chỉ với ba khái niệm này mà dựng được từ chatbot đơn giản tới agent nhiều bước có người duyệt. Phần còn lại của khóa học là các cách dùng chúng.</p>
+
+    <h2>LangGraph đứng ở đâu</h2>
+    <table>
+      <thead><tr><th>Thứ</th><th>Là gì</th><th>Quan hệ với LangGraph</th></tr></thead>
+      <tbody>
+        <tr><td><strong>LangChain</strong></td><td>Bộ thư viện chung: kết nối model (Claude, GPT…), định nghĩa tool, message.</td><td>LangGraph <em>dùng</em> các mảnh này bên trong node. Mình sẽ dùng <code>init_chat_model</code>, <code>@tool</code> từ LangChain.</td></tr>
+        <tr><td><strong>LangGraph</strong></td><td>Khung để <em>điều phối</em>: state, luồng đi, vòng lặp, bộ nhớ, dừng chờ duyệt.</td><td>Chính là khóa học này.</td></tr>
+        <tr><td><code>create_agent</code></td><td>Hàm dựng sẵn một agent hoàn chỉnh trong một dòng (chạy trên LangGraph).</td><td>Tiện cho agent tiêu chuẩn. Hiểu LangGraph để biết nó làm gì bên dưới và tùy biến khi cần (Phần 2).</td></tr>
+      </tbody>
+    </table>
+    <div class="callout tip" data-title="Mình hiểu sai lúc đầu"><p>Mình từng nghĩ LangGraph là một “AI” hay một model. Không phải. Nó là <strong>code điều phối thuần Python</strong> — không có LLM nào bên trong. LLM chỉ là một thứ mình gọi bên trong <em>một vài</em> node. Thậm chí có thể dựng graph không dùng LLM nào, và bài 3–4 làm đúng như vậy để hiểu cơ chế trước.</p></div>
+
+    <h2>App ví dụ xuyên suốt khóa học</h2>
+    <p>Mình sẽ dựng dần một <strong>trợ lý chăm sóc khách hàng</strong> cho một shop online:</p>
+    <ul>
+      <li>Tra cứu đơn hàng theo mã (DH001, DH002…).</li>
+      <li>Nhớ cuộc trò chuyện với từng khách.</li>
+      <li>Xử lý yêu cầu hoàn tiền — nhưng <strong>dừng lại chờ nhân viên duyệt</strong> trước khi hoàn.</li>
+    </ul>
+    <p>Mỗi bài thêm một mảnh; bài 10 ghép tất cả thành app hoàn chỉnh. Bài 11 gọi tên các <strong>pattern</strong> chuẩn của ngành (ReAct, routing, plan-and-execute…) để mình đọc tài liệu và bàn thiết kế bằng đúng từ vựng.</p>
+
+    <h2>Học cái này mất bao lâu</h2>
+    <table>
+      <thead><tr><th>Phần</th><th>Đọc</th><th>Thực hành</th><th>Tổng</th></tr></thead>
+      <tbody>
+        <tr><td>Phần 1 · Cốt lõi (11 bài)</td><td>≈ 2,5 giờ</td><td>≈ 5,5 giờ</td><td><strong>≈ 8 giờ</strong></td></tr>
+        <tr><td>Phần 2 · Nâng cao (6 bài)</td><td>≈ 1,5 giờ</td><td>≈ 3,5 giờ</td><td>≈ 5 giờ</td></tr>
+        <tr><td>Ôn lại, tự dựng lại bài 10 không nhìn hướng dẫn</td><td></td><td>≈ 1 giờ</td><td>≈ 1 giờ</td></tr>
+        <tr><td colspan="3"><strong>Tổng</strong></td><td><strong>≈ 14 giờ</strong></td></tr>
+      </tbody>
+    </table>
+    <p>Với 2 giờ mỗi ngày, lộ trình gợi ý là <strong>8 buổi</strong> (5 buổi Phần 1, 3 buổi Phần 2):</p>
+    <table>
+      <thead><tr><th>Buổi</th><th>Bài</th><th>Xong buổi này thì…</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>1. Tổng quan · 2. Môi trường · 3. Graph đầu tiên</td><td>Chạy được graph đầu tiên, hiểu State/Node/Edge bằng code.</td></tr>
+        <tr><td>2</td><td>4. State và reducer · 5. Gọi LLM · 6. Rẽ nhánh</td><td>Chatbot gọi Claude, graph biết rẽ nhánh theo dữ liệu.</td></tr>
+        <tr><td>3</td><td>7. Tool và vòng lặp agent · 8. Bộ nhớ</td><td>Agent tự tra cứu dữ liệu và nhớ cuộc trò chuyện.</td></tr>
+        <tr><td>4</td><td>9. Dừng chờ người duyệt · 10. Dựng app</td><td>Trợ lý CSKH hoàn chỉnh có bước duyệt hoàn tiền.</td></tr>
+        <tr><td>5</td><td>11. Bản đồ pattern · ôn Phần 1</td><td>Gọi đúng tên ReAct, routing, plan-and-execute, reflection… và biết chọn pattern cho bài toán mới.</td></tr>
+        <tr><td>6</td><td>Phần 2: 12. create_agent · 13. Lưu trữ production</td><td>Dựng agent bằng hàm có sẵn, bộ nhớ bền trên Postgres.</td></tr>
+        <tr><td>7</td><td>Phần 2: 14. Web API và stream · 15. Chạy song song</td><td>Agent chạy sau một API thật, xử lý nhiều việc cùng lúc.</td></tr>
+        <tr><td>8</td><td>Phần 2: 16. Multi-agent · 17. Debug, test, deploy</td><td>Chia agent lớn thành nhóm, viết test và đưa lên chạy.</td></tr>
+      </tbody>
+    </table>
+    <div class="callout tip"><p>Con số là cho người đã viết Python quen tay. Bài 3–4, 6, 8–9 chạy được không cần API key; chỉ bài 5, 7, 10, 11 cần key Anthropic (tốn vài nghìn đồng tiền API cho cả khóa).</p></div>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Giải thích State, Node, Edge bằng lời của bạn.</summary><p>State là dữ liệu chung đi qua graph (phiếu công việc); Node là một hàm đọc state và trả về phần cần cập nhật (một bàn làm việc); Edge là quy định node nào chạy tiếp theo (mũi tên).</p></details>
+      <details><summary>Vì sao agent cần vòng lặp chứ không phải một chuỗi bước cố định?</summary><p>Vì không biết trước cần bao nhiêu lần gọi tool. LLM xem kết quả rồi tự quyết gọi thêm tool hay trả lời luôn.</p></details>
+      <details><summary>LangGraph có chứa LLM không?</summary><p>Không. Nó là code điều phối; LLM chỉ được gọi bên trong những node mình viết.</p></details>
+    </div>
+  </section>
+
+  <section class="lesson" id="moi-truong" data-part="1 · Cốt lõi" data-title="Chuẩn bị môi trường và lần gọi LLM đầu tiên" data-minutes="10" data-practice="25" data-updated="2026-11-15" data-done="false" data-summary="Tạo môi trường Python, cài LangGraph, cấu hình API key và gọi Claude lần đầu.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li>Cần <strong>Python 3.10+</strong>. Mỗi project một môi trường ảo (<code>.venv</code>) riêng.</li>
+        <li>Ba gói: <code>langgraph</code> (điều phối), <code>langchain</code> (model, tool), <code>langchain-anthropic</code> (kết nối Claude).</li>
+        <li>API key để trong biến môi trường <code>ANTHROPIC_API_KEY</code>, không bao giờ ghi vào code.</li>
+      </ul>
+    </div>
+    <div class="callout warning"><p>Các khung terminal là <strong>ví dụ output</strong>. Output của graph ở bài 3, 4, 6, 8, 9 được chạy thật; output có câu trả lời của Claude là minh họa — mỗi lần chạy model sẽ diễn đạt khác đi một chút.</p></div>
+
+    <h2>Bước 1: Tạo project và môi trường ảo</h2>
+    <p>Mình dùng <strong>uv</strong> — công cụ quản lý Python rất nhanh (cài bằng <code>brew install uv</code>). Dùng <code>python -m venv</code> cũng được, các lệnh tương đương.</p>
+    <div class="term" data-title="zsh"><pre>$ mkdir hoc-langgraph &amp;&amp; cd hoc-langgraph
+$ uv venv --python 3.12
+Using CPython 3.12.12
+Creating virtual environment at: .venv
+Activate with: source .venv/bin/activate
+
+$ source .venv/bin/activate
+(hoc-langgraph) $ python --version
+Python 3.12.12</pre></div>
+    <p>Dòng prompt có thêm <code>(hoc-langgraph)</code> nghĩa là môi trường ảo đang bật: mọi gói cài sau đây chỉ nằm trong project này, không đụng tới Python của máy.</p>
+
+    <h2>Bước 2: Cài thư viện</h2>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ uv pip install langgraph langchain langchain-anthropic
+Resolved 34 packages in 1.2s
+Installed 34 packages in 210ms
+ + langchain==1.5.0
+ + langchain-anthropic==1.7.10
+ + langchain-core==1.8.1
+ + langgraph==1.2.22
+ + langgraph-checkpoint==4.3.2
+ ...</pre></div>
+    <table>
+      <thead><tr><th>Gói</th><th>Mình dùng nó để</th></tr></thead>
+      <tbody>
+        <tr><td><code>langgraph</code></td><td>Dựng graph: <code>StateGraph</code>, <code>START</code>, <code>END</code>, checkpointer, <code>interrupt</code>.</td></tr>
+        <tr><td><code>langchain</code></td><td><code>init_chat_model</code> để tạo model; nền tảng message và tool (<code>langchain-core</code> đi kèm).</td></tr>
+        <tr><td><code>langchain-anthropic</code></td><td>Kết nối tới Claude.</td></tr>
+      </tbody>
+    </table>
+    <div class="callout tip"><p>Ghi phiên bản lại để lần sau cài đúng như vậy: <code>uv pip freeze &gt; requirements.txt</code>. LangGraph thay đổi khá nhanh — code trong khóa học viết cho LangGraph 1.2 / LangChain 1.5.</p></div>
+
+    <h2>Bước 3: API key</h2>
+    <p>Lấy key ở trang quản trị của Anthropic (Console → API Keys), rồi đặt vào biến môi trường. Thư viện tự đọc biến <code>ANTHROPIC_API_KEY</code>:</p>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ export ANTHROPIC_API_KEY="sk-ant-..."
+$ echo 'export ANTHROPIC_API_KEY="sk-ant-..."' &gt;&gt; ~/.zshrc   <span class="cm"># để lần sau mở terminal vẫn còn</span></pre></div>
+    <div class="callout warning"><p>Không bao giờ dán key vào file <code>.py</code> rồi commit lên Git. Bot quét GitHub tìm key bị lộ chỉ trong vài phút.</p></div>
+
+    <h2>Bước 4: Gọi Claude lần đầu</h2>
+<pre data-file="hello_llm.py"><code class="language-python">from langchain.chat_models import init_chat_model
+
+llm = init_chat_model("anthropic:claude-opus-5-5")
+
+tra_loi = llm.invoke("Giải thích LangGraph trong một câu, cho người mới học.")
+print(tra_loi.text)</code></pre>
+    <ul>
+      <li><code>init_chat_model("nhà-cung-cấp:tên-model")</code> — tạo đối tượng model. Đổi chuỗi này là đổi model, phần code còn lại giữ nguyên.</li>
+      <li><code>llm.invoke(...)</code> — gửi câu hỏi, chờ câu trả lời. Kết quả là một <strong>message</strong> (<code>AIMessage</code>), không phải chuỗi.</li>
+      <li><code>.text</code> — lấy phần chữ của message.</li>
+    </ul>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ python hello_llm.py
+LangGraph là thư viện giúp bạn dựng ứng dụng AI gồm nhiều bước dưới dạng một sơ đồ,
+trong đó mỗi bước là một hàm và dữ liệu được truyền qua các bước theo luồng bạn định nghĩa.</pre></div>
+    <p>Nếu thấy lỗi <code>AuthenticationError</code> thì key chưa được đặt đúng — chạy <code>echo $ANTHROPIC_API_KEY</code> để kiểm tra.</p>
+    <p>Nhìn thử bên trong message trả về để biết nó có gì:</p>
+    <div class="term" data-title="python — trong REPL"><pre>&gt;&gt;&gt; tra_loi.type
+'ai'
+&gt;&gt;&gt; tra_loi.usage_metadata
+{'input_tokens': 24, 'output_tokens': 61, 'total_tokens': 85}</pre></div>
+    <p><code>usage_metadata</code> cho biết số token — tức là số tiền mỗi lần gọi. Hữu ích khi về sau agent gọi LLM nhiều lần trong một vòng lặp.</p>
+
+    <h2>Cấu trúc thư mục cho khóa học</h2>
+<pre><code class="language-text">hoc-langgraph/
+├── .venv/              ← môi trường ảo (không commit)
+├── requirements.txt
+├── hello_llm.py        ← bài 2
+├── graph_dau_tien.py   ← bài 3
+├── reducer.py          ← bài 4
+├── chatbot.py          ← bài 5
+├── phan_loai.py        ← bài 6
+├── agent.py            ← bài 7–8
+├── duyet.py            ← bài 9
+└── tro_ly_cskh.py      ← bài 10</code></pre>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Vì sao nên dùng môi trường ảo riêng cho mỗi project?</summary><p>Để phiên bản thư viện của project này không xung đột với project khác hay với Python của hệ thống.</p></details>
+      <details><summary>Muốn đổi sang model khác thì sửa ở đâu?</summary><p>Chuỗi trong init_chat_model, ví dụ "anthropic:claude-sonnet-5-5". Phần còn lại của code giữ nguyên.</p></details>
+      <details><summary>llm.invoke() trả về chuỗi hay gì?</summary><p>Một message (AIMessage). Lấy chữ bằng .text; ngoài ra còn thông tin như usage_metadata, tool_calls.</p></details>
+    </div>
+  </section>
+
+  <section class="lesson" id="graph-dau-tien" data-part="1 · Cốt lõi" data-title="Graph đầu tiên: State, Node, Edge" data-minutes="15" data-practice="30" data-updated="2026-11-15" data-done="false" data-summary="Viết từng dòng một graph hai node, chạy invoke và stream, vẽ graph ra sơ đồ.">
+    <div class="callout note" data-title="Cần nhớ — 5 bước dựng mọi graph">
+      <ol>
+        <li>Định nghĩa <strong>State</strong> bằng <code>TypedDict</code>.</li>
+        <li>Viết các <strong>node</strong>: hàm nhận state, <strong>trả về dict chỉ chứa phần cần cập nhật</strong>.</li>
+        <li><code>StateGraph(State)</code> rồi <code>add_node</code>.</li>
+        <li><code>add_edge</code> nối từ <code>START</code> tới <code>END</code>.</li>
+        <li><code>compile()</code> rồi <code>invoke()</code>.</li>
+      </ol>
+    </div>
+    <p>Bài này chưa dùng LLM — cố ý. Mình muốn hiểu cơ chế graph trước bằng những hàm Python đơn giản nhất, chạy ra kết quả đoán trước được. Khi đã chắc cơ chế, thay một node bằng lời gọi LLM là chuyện nhỏ.</p>
+    <p>Mục tiêu: graph nhận tên khách, node thứ nhất tạo lời chào, node thứ hai thêm câu chúc.</p>
+
+    <h2>Bước 1 — State: graph mang theo dữ liệu gì?</h2>
+<pre data-file="graph_dau_tien.py" data-add="1-5"><code class="language-python">from typing import TypedDict
+
+class State(TypedDict):
+    ten: str
+    loi_chao: str</code></pre>
+    <p><code>TypedDict</code> mô tả “phiếu công việc” có những ô nào và kiểu gì. Ở đây có hai ô: <code>ten</code> (tên khách) và <code>loi_chao</code>. Bên trong graph, state là một <code>dict</code> Python bình thường: <code>{"ten": "Kiệt", "loi_chao": "..."}</code>.</p>
+
+    <h3>Bước 2 — Node: mỗi bàn làm một việc</h3>
+<pre data-file="graph_dau_tien.py" data-add="7-11"><code class="language-python">from typing import TypedDict
+
+class State(TypedDict):
+    ten: str
+    loi_chao: str
+
+def chao(state: State):
+    return {"loi_chao": f"Xin chào {state['ten']}!"}
+
+def them_loi_chuc(state: State):
+    return {"loi_chao": state["loi_chao"] + " Chúc một ngày tốt lành."}</code></pre>
+    <p>Node là hàm Python thường. Điều quan trọng nhất của bài nằm ở đây: <strong>node không trả về cả state, chỉ trả về những ô nó muốn thay đổi</strong>. Node <code>chao</code> trả về <code>{"loi_chao": ...}</code> — ô <code>ten</code> không nhắc tới thì giữ nguyên. LangGraph tự gộp phần cập nhật vào state.</p>
+    <div class="callout tip" data-title="Mình ghi nhớ thế này"><p>Node giống người ở một bàn: <strong>đọc cả phiếu, nhưng chỉ ghi vào ô của mình</strong>. Không cần chép lại cả phiếu.</p></div>
+
+    <h3>Bước 3 — Tạo graph và thêm node</h3>
+<pre data-file="graph_dau_tien.py" data-add="2,14-16"><code class="language-python">from typing import TypedDict
+from langgraph.graph import StateGraph, START, END
+
+class State(TypedDict):
+    ten: str
+    loi_chao: str
+
+def chao(state: State):
+    return {"loi_chao": f"Xin chào {state['ten']}!"}
+
+def them_loi_chuc(state: State):
+    return {"loi_chao": state["loi_chao"] + " Chúc một ngày tốt lành."}
+
+builder = StateGraph(State)
+builder.add_node("chao", chao)
+builder.add_node("them_loi_chuc", them_loi_chuc)</code></pre>
+    <p><code>StateGraph(State)</code> tạo một “bản thiết kế” graph dùng state kiểu <code>State</code>. <code>add_node("tên", hàm)</code> đặt tên cho node — tên này dùng khi nối edge và hiện trong output.</p>
+
+    <h3>Bước 4 — Nối edge</h3>
+<pre data-file="graph_dau_tien.py" data-add="17-19"><code class="language-python">from typing import TypedDict
+from langgraph.graph import StateGraph, START, END
+
+class State(TypedDict):
+    ten: str
+    loi_chao: str
+
+def chao(state: State):
+    return {"loi_chao": f"Xin chào {state['ten']}!"}
+
+def them_loi_chuc(state: State):
+    return {"loi_chao": state["loi_chao"] + " Chúc một ngày tốt lành."}
+
+builder = StateGraph(State)
+builder.add_node("chao", chao)
+builder.add_node("them_loi_chuc", them_loi_chuc)
+builder.add_edge(START, "chao")
+builder.add_edge("chao", "them_loi_chuc")
+builder.add_edge("them_loi_chuc", END)</code></pre>
+    <p><code>START</code> và <code>END</code> là hai điểm đặc biệt có sẵn: điểm vào và điểm ra của graph. Ba dòng này đọc thành: <em>bắt đầu → chao → them_loi_chuc → kết thúc</em>.</p>
+
+    <h3>Bước 5 — Compile và chạy</h3>
+<pre data-file="graph_dau_tien.py" data-add="20-23"><code class="language-python">from typing import TypedDict
+from langgraph.graph import StateGraph, START, END
+
+class State(TypedDict):
+    ten: str
+    loi_chao: str
+
+def chao(state: State):
+    return {"loi_chao": f"Xin chào {state['ten']}!"}
+
+def them_loi_chuc(state: State):
+    return {"loi_chao": state["loi_chao"] + " Chúc một ngày tốt lành."}
+
+builder = StateGraph(State)
+builder.add_node("chao", chao)
+builder.add_node("them_loi_chuc", them_loi_chuc)
+builder.add_edge(START, "chao")
+builder.add_edge("chao", "them_loi_chuc")
+builder.add_edge("them_loi_chuc", END)
+graph = builder.compile()
+
+ket_qua = graph.invoke({"ten": "Kiệt"})
+print(ket_qua)</code></pre>
+    <p><code>compile()</code> kiểm tra bản thiết kế (node nào không có đường đi tới, edge trỏ vào node không tồn tại…) và tạo ra graph chạy được. <code>invoke(state_ban_dau)</code> chạy từ đầu tới cuối và trả về <strong>state cuối cùng</strong>.</p>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ python graph_dau_tien.py
+{'ten': 'Kiệt', 'loi_chao': 'Xin chào Kiệt! Chúc một ngày tốt lành.'}</pre></div>
+    <p>Mình chỉ truyền vào <code>ten</code>; ô <code>loi_chao</code> do hai node lần lượt điền.</p>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 190" role="img" aria-label="State thay đổi qua hai node"><defs><marker id="lg3h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker></defs>
+<rect class="box" x="10" y="20" width="76" height="38" rx="19"/><text x="48" y="44" text-anchor="middle" class="m">START</text>
+<rect class="acc" x="150" y="12" width="160" height="54" rx="8"/><text x="230" y="44" text-anchor="middle" class="b m">chao</text>
+<rect class="acc" x="380" y="12" width="180" height="54" rx="8"/><text x="470" y="44" text-anchor="middle" class="b m">them_loi_chuc</text>
+<rect class="box" x="628" y="20" width="76" height="38" rx="19"/><text x="666" y="44" text-anchor="middle" class="m">END</text>
+<path class="ln" d="M86,39 H146" marker-end="url(#lg3h)"/><path class="ln" d="M310,39 H376" marker-end="url(#lg3h)"/><path class="ln" d="M560,39 H624" marker-end="url(#lg3h)"/>
+<text x="20" y="104" class="s">state vào</text><text x="20" y="124" class="s m">ten: "Kiệt"</text>
+<text x="160" y="104" class="s">chao trả về</text><text x="160" y="124" class="s m a">loi_chao: "Xin chào Kiệt!"</text>
+<text x="390" y="104" class="s">them_loi_chuc trả về</text><text x="390" y="124" class="s m a">loi_chao: "…! Chúc một ngày…"</text>
+<rect class="ok" x="150" y="140" width="554" height="40" rx="8"/><text x="164" y="165" class="s m">state cuối: { ten: "Kiệt", loi_chao: "Xin chào Kiệt! Chúc một ngày…" }</text>
+</svg><figcaption>Mỗi node chỉ trả về ô nó đổi; LangGraph gộp dần vào state.</figcaption></figure>
+
+    <h2>stream: xem từng bước thay vì chỉ kết quả cuối</h2>
+    <p><code>invoke</code> chỉ cho kết quả cuối. Khi debug hay muốn hiện tiến trình cho người dùng, dùng <code>stream</code> — nó trả về từng mẩu ngay khi mỗi node chạy xong:</p>
+<pre><code class="language-python">for buoc in graph.stream({"ten": "Kiệt"}, stream_mode="updates"):
+    print(buoc)</code></pre>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ python graph_dau_tien.py
+{'chao': {'loi_chao': 'Xin chào Kiệt!'}}
+{'them_loi_chuc': {'loi_chao': 'Xin chào Kiệt! Chúc một ngày tốt lành.'}}</pre></div>
+    <p>Mỗi dòng có dạng <code>{tên_node: phần_cập_nhật}</code> — đúng thứ node đó trả về. <code>stream_mode="updates"</code> là chế độ mình dùng nhiều nhất khi debug: nhìn vào là biết node nào đã chạy và nó ghi gì.</p>
+    <table>
+      <thead><tr><th>stream_mode</th><th>Mỗi lần nhận được</th></tr></thead>
+      <tbody>
+        <tr><td><code>"updates"</code></td><td>Phần cập nhật của node vừa chạy. Hay dùng nhất.</td></tr>
+        <tr><td><code>"values"</code></td><td>Toàn bộ state sau mỗi bước.</td></tr>
+        <tr><td><code>"messages"</code></td><td>Từng token LLM đang sinh ra — để làm hiệu ứng chữ chạy (bài 5).</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Vẽ graph ra sơ đồ</h2>
+    <p>Graph lớn dần thì nhìn code khó hình dung. LangGraph xuất được sơ đồ dạng Mermaid:</p>
+    <div class="term" data-title="python — trong REPL"><pre>&gt;&gt;&gt; print(graph.get_graph().draw_mermaid())
+graph TD;
+	__start__([&lt;p&gt;__start__&lt;/p&gt;]):::first
+	chao(chao)
+	them_loi_chuc(them_loi_chuc)
+	__end__([&lt;p&gt;__end__&lt;/p&gt;]):::last
+	__start__ --&gt; chao;
+	chao --&gt; them_loi_chuc;
+	them_loi_chuc --&gt; __end__;
+	...</pre></div>
+    <p>Dán đoạn đó vào <a href="https://mermaid.live">mermaid.live</a> là ra hình. Trong Jupyter notebook có thể hiện thẳng ảnh bằng <code>graph.get_graph().draw_mermaid_png()</code>.</p>
+
+    <h2>Thí nghiệm: quên trả về dict</h2>
+    <p>Sửa node <code>chao</code> trả về chuỗi thay vì dict: <code>return f"Xin chào {state['ten']}!"</code>, chạy lại:</p>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ python graph_dau_tien.py
+Traceback (most recent call last):
+  ...
+<span class="err">langgraph.errors.InvalidUpdateError: Expected dict, got Xin chào Kiệt!</span></pre></div>
+    <p>Lỗi rất hay gặp lúc mới viết. Node luôn trả về <code>dict</code> với key là tên ô trong State (hoặc <code>{}</code> nếu không đổi gì).</p>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Node trả về {"loi_chao": "..."} thì ô ten trong state ra sao?</summary><p>Giữ nguyên. Node chỉ cập nhật các key nó trả về; LangGraph gộp vào state hiện tại.</p></details>
+      <details><summary>invoke và stream khác nhau thế nào?</summary><p>invoke chạy hết rồi trả về state cuối; stream trả về từng mẩu (mặc định theo stream_mode) ngay khi mỗi bước xong.</p></details>
+      <details><summary>Quên add_edge(START, ...) thì sao?</summary><p>compile() báo lỗi vì graph không có điểm vào.</p></details>
+    </div>
+  </section>
+
+  <section class="lesson" id="state-reducer" data-part="1 · Cốt lõi" data-title="State và reducer: ghi đè hay nối thêm" data-minutes="12" data-practice="25" data-updated="2026-11-15" data-done="false" data-summary="Vì sao danh sách trong state bị mất, reducer giải quyết thế nào, và MessagesState cho chatbot.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li>Mặc định, giá trị node trả về <strong>ghi đè</strong> ô cũ trong state.</li>
+        <li>Muốn <strong>nối thêm</strong> (danh sách tin nhắn, nhật ký), gắn <strong>reducer</strong>: <code>Annotated[list, operator.add]</code>.</li>
+        <li>Chatbot/agent dùng sẵn <code>MessagesState</code>: có ô <code>messages</code> với reducer <code>add_messages</code>.</li>
+      </ul>
+    </div>
+
+    <h2>Vấn đề: dữ liệu biến mất</h2>
+    <p>Giả sử mình muốn mỗi node ghi một dòng vào “nhật ký xử lý” để tiện debug. Viết như bài trước:</p>
+<pre data-file="reducer.py"><code class="language-python">from typing import TypedDict
+from langgraph.graph import StateGraph, START, END
+
+class State(TypedDict):
+    nhat_ky: list[str]
+
+def a(state: State):
+    return {"nhat_ky": ["a đã chạy"]}
+
+def b(state: State):
+    return {"nhat_ky": ["b đã chạy"]}
+
+builder = StateGraph(State)
+builder.add_node("a", a)
+builder.add_node("b", b)
+builder.add_edge(START, "a")
+builder.add_edge("a", "b")
+builder.add_edge("b", END)
+graph = builder.compile()
+
+print(graph.invoke({"nhat_ky": []}))</code></pre>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ python reducer.py
+{'nhat_ky': [<span class="err">'b đã chạy'</span>]}</pre></div>
+    <p>Dòng của node <code>a</code> mất. Lý do: mặc định, giá trị node trả về <strong>thay thế</strong> giá trị cũ của ô đó. Node <code>b</code> trả về <code>["b đã chạy"]</code> nên ô <code>nhat_ky</code> bị ghi đè thành đúng danh sách đó.</p>
+    <p>Có thể sửa bằng cách node tự đọc danh sách cũ rồi nối: <code>state["nhat_ky"] + ["b đã chạy"]</code>. Nhưng node nào cũng phải nhớ làm vậy — quên một chỗ là mất dữ liệu. LangGraph có cách gọn hơn.</p>
+
+    <h2>Reducer: quy định cách gộp</h2>
+    <p><strong>Reducer</strong> là một hàm gắn vào một ô của state, quyết định “giá trị cũ + giá trị node trả về = giá trị mới” như thế nào. Gắn bằng <code>Annotated</code>:</p>
+<pre data-file="reducer.py" data-add="1,2,6"><code class="language-python">import operator
+from typing import TypedDict, Annotated
+from langgraph.graph import StateGraph, START, END
+
+class State(TypedDict):
+    nhat_ky: Annotated[list[str], operator.add]
+
+# ... phần còn lại giữ nguyên</code></pre>
+    <p>Đọc dòng 6: <em>“ô <code>nhat_ky</code> là <code>list[str]</code>, và khi gộp thì dùng <code>operator.add</code>”</em>. Với list, <code>operator.add(cu, moi)</code> chính là <code>cu + moi</code> — nối hai danh sách.</p>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ python reducer.py
+{'nhat_ky': [<span class="ok">'a đã chạy', 'b đã chạy'</span>]}</pre></div>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 200" role="img" aria-label="So sánh ghi đè và nối thêm bằng reducer"><defs><marker id="lg4h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker></defs>
+<rect class="zone" x="8" y="8" width="346" height="184" rx="12"/><text x="24" y="32" class="b">Không reducer: ghi đè</text>
+<rect class="box" x="24" y="48" width="140" height="40" rx="8"/><text x="34" y="66" class="s">cũ</text><text x="34" y="81" class="s m">["a đã chạy"]</text>
+<rect class="acc" x="196" y="48" width="140" height="40" rx="8"/><text x="206" y="66" class="s">node b trả về</text><text x="206" y="81" class="s m">["b đã chạy"]</text>
+<rect class="warn" x="80" y="124" width="200" height="46" rx="8"/><text x="94" y="144" class="s">mới = giá trị node trả về</text><text x="94" y="161" class="s m">["b đã chạy"]</text>
+<path class="ln" d="M266,88 L200,120" marker-end="url(#lg4h)"/>
+<rect class="zone" x="366" y="8" width="346" height="184" rx="12"/><text x="382" y="32" class="b">operator.add: nối thêm</text>
+<rect class="box" x="382" y="48" width="140" height="40" rx="8"/><text x="392" y="66" class="s">cũ</text><text x="392" y="81" class="s m">["a đã chạy"]</text>
+<rect class="acc" x="554" y="48" width="140" height="40" rx="8"/><text x="564" y="66" class="s">node b trả về</text><text x="564" y="81" class="s m">["b đã chạy"]</text>
+<rect class="ok" x="420" y="124" width="256" height="46" rx="8"/><text x="434" y="144" class="s">mới = cũ + trả về</text><text x="434" y="161" class="s m">["a đã chạy", "b đã chạy"]</text>
+<path class="ln" d="M452,88 L520,120" marker-end="url(#lg4h)"/><path class="ln" d="M624,88 L580,120" marker-end="url(#lg4h)"/>
+</svg><figcaption>Reducer quyết định cách gộp giá trị node trả về vào state. Không khai báo thì là ghi đè.</figcaption></figure>
+    <p>Giờ mọi node chỉ cần trả về <em>phần mới</em>; việc nối do reducer lo. Các ô không có reducer (như <code>loi_chao</code> ở bài 3) vẫn ghi đè như cũ — đúng ý cho dữ liệu kiểu “giá trị hiện tại”.</p>
+
+    <h2>Tin nhắn trong LangChain</h2>
+    <p>Chatbot và agent làm việc với một <strong>danh sách tin nhắn</strong>. LangChain có sẵn các loại:</p>
+    <table>
+      <thead><tr><th>Loại</th><th>Ai nói</th><th>Ví dụ</th></tr></thead>
+      <tbody>
+        <tr><td><code>SystemMessage</code></td><td>Chỉ dẫn cho model</td><td>“Bạn là trợ lý CSKH của shop…”</td></tr>
+        <tr><td><code>HumanMessage</code></td><td>Người dùng</td><td>“Đơn DH001 tới đâu rồi?”</td></tr>
+        <tr><td><code>AIMessage</code></td><td>Model trả lời (có thể kèm yêu cầu gọi tool)</td><td>“Đơn đang giao…”</td></tr>
+        <tr><td><code>ToolMessage</code></td><td>Kết quả chạy tool</td><td><code>{"trang_thai": "đang giao"}</code></td></tr>
+      </tbody>
+    </table>
+
+    <h2>MessagesState: state có sẵn cho chatbot</h2>
+    <p>Vì gần như mọi chatbot/agent đều cần “một danh sách tin nhắn được nối thêm”, LangGraph có sẵn <code>MessagesState</code> — tương đương tự viết:</p>
+<pre><code class="language-python">from typing import TypedDict, Annotated
+from langgraph.graph.message import add_messages
+
+class MessagesState(TypedDict):
+    messages: Annotated[list, add_messages]</code></pre>
+    <p><code>add_messages</code> là reducer “thông minh” hơn <code>operator.add</code>: nối tin nhắn mới vào cuối, nhưng nếu tin nhắn mới có cùng <code>id</code> với tin cũ thì <em>thay</em> tin cũ — hữu ích khi về sau muốn sửa một tin nhắn. Nó cũng nhận cả dict kiểu <code>{"role": "user", "content": "..."}</code> và tự đổi sang message.</p>
+    <p>Thử một “bot nhại lại” — chưa có LLM, chỉ để xem state tin nhắn hoạt động:</p>
+<pre data-file="reducer.py"><code class="language-python">from langchain_core.messages import HumanMessage, AIMessage
+from langgraph.graph import StateGraph, START, END, MessagesState
+
+def bot(state: MessagesState):
+    cau_hoi = state["messages"][-1].content          # tin nhắn cuối cùng
+    return {"messages": [AIMessage(content=f"Bạn vừa hỏi: {cau_hoi}")]}
+
+builder = StateGraph(MessagesState)
+builder.add_node("bot", bot)
+builder.add_edge(START, "bot")
+builder.add_edge("bot", END)
+graph = builder.compile()
+
+ket_qua = graph.invoke({"messages": [HumanMessage(content="Đơn DH001 tới đâu rồi?")]})
+for m in ket_qua["messages"]:
+    m.pretty_print()</code></pre>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ python reducer.py
+================================ Human Message =================================
+
+Đơn DH001 tới đâu rồi?
+================================== Ai Message ==================================
+
+Bạn vừa hỏi: Đơn DH001 tới đâu rồi?</pre></div>
+    <p>Node <code>bot</code> chỉ trả về <em>một</em> tin nhắn mới, nhưng state cuối có cả hai — nhờ reducer <code>add_messages</code>. <code>pretty_print()</code> in tin nhắn có khung, rất tiện khi debug.</p>
+
+    <h2>Thêm ô riêng vào MessagesState</h2>
+    <p>Cần thêm dữ liệu ngoài tin nhắn (ví dụ mã khách hàng)? Kế thừa:</p>
+<pre><code class="language-python">class State(MessagesState):
+    ma_khach: str          # ô thường, ghi đè
+    so_lan_goi_tool: int</code></pre>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Hai node cùng trả về {"nhat_ky": [...]}, ô nhat_ky không có reducer. Kết quả cuối là gì?</summary><p>Chỉ còn giá trị của node chạy sau — ghi đè.</p></details>
+      <details><summary>add_messages khác operator.add ở điểm nào?</summary><p>add_messages thay tin nhắn có cùng id thay vì nối trùng, và tự đổi dict sang message. operator.add chỉ nối hai list.</p></details>
+      <details><summary>Node trong chatbot nên trả về cả danh sách tin nhắn hay chỉ tin mới?</summary><p>Chỉ tin mới. Trả về cả danh sách sẽ làm tin nhắn bị nhân đôi vì reducer nối thêm.</p></details>
+    </div>
+  </section>
+
+  <section class="lesson" id="goi-llm" data-part="1 · Cốt lõi" data-title="Gọi LLM trong node: chatbot đầu tiên" data-minutes="12" data-practice="30" data-updated="2026-11-15" data-done="false" data-summary="Node gọi Claude với system prompt, trò chuyện nhiều lượt và hiện chữ chạy bằng stream.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li>Node gọi LLM = một hàm: lấy <code>state["messages"]</code>, gọi <code>llm.invoke(...)</code>, trả về <code>{"messages": [tra_loi]}</code>.</li>
+        <li>System prompt ghép vào đầu danh sách <em>lúc gọi</em>, không cần lưu vào state.</li>
+        <li>Chữ chạy từng token: <code>stream_mode="messages"</code>.</li>
+      </ul>
+    </div>
+
+    <h2>Từ bot nhại lại tới chatbot thật</h2>
+    <p>Bài trước node <code>bot</code> chỉ nhại lại câu hỏi. Giờ thay ruột nó bằng một lời gọi Claude. Phần graph gần như không đổi — đúng như đã nói ở bài 1: LLM chỉ là một thứ được gọi bên trong node.</p>
+
+    <h3>Bước 1 — Tạo model và system prompt</h3>
+<pre data-file="chatbot.py" data-add="1-8"><code class="language-python">from langchain.chat_models import init_chat_model
+from langchain_core.messages import SystemMessage, HumanMessage
+from langgraph.graph import StateGraph, START, END, MessagesState
+
+llm = init_chat_model("anthropic:claude-opus-5-5")
+
+SYSTEM = SystemMessage("Bạn là trợ lý chăm sóc khách hàng của shop Kiệt Store. "
+                       "Trả lời ngắn gọn, thân thiện, bằng tiếng Việt.")</code></pre>
+    <p>Model và system prompt tạo <strong>một lần</strong> ở ngoài, không tạo lại trong mỗi lần node chạy.</p>
+
+    <h3>Bước 2 — Node gọi LLM</h3>
+<pre data-file="chatbot.py" data-add="10-12"><code class="language-python">from langchain.chat_models import init_chat_model
+from langchain_core.messages import SystemMessage, HumanMessage
+from langgraph.graph import StateGraph, START, END, MessagesState
+
+llm = init_chat_model("anthropic:claude-opus-5-5")
+
+SYSTEM = SystemMessage("Bạn là trợ lý chăm sóc khách hàng của shop Kiệt Store. "
+                       "Trả lời ngắn gọn, thân thiện, bằng tiếng Việt.")
+
+def goi_llm(state: MessagesState):
+    tra_loi = llm.invoke([SYSTEM] + state["messages"])
+    return {"messages": [tra_loi]}</code></pre>
+    <ul>
+      <li><code>[SYSTEM] + state["messages"]</code> — ghép system prompt vào đầu <em>lúc gửi</em>. State chỉ giữ hội thoại thật giữa khách và bot; system prompt không cần lưu, sửa nó là có hiệu lực ngay lần gọi sau.</li>
+      <li>Model đọc <strong>toàn bộ</strong> danh sách tin nhắn mỗi lần gọi — đó là cách nó “biết” ngữ cảnh. Hội thoại càng dài, mỗi lần gọi càng tốn token.</li>
+      <li>Trả về <em>chỉ</em> tin trả lời mới; reducer <code>add_messages</code> nối vào.</li>
+    </ul>
+
+    <h3>Bước 3 — Graph và chạy</h3>
+<pre data-file="chatbot.py" data-add="14-21"><code class="language-python">from langchain.chat_models import init_chat_model
+from langchain_core.messages import SystemMessage, HumanMessage
+from langgraph.graph import StateGraph, START, END, MessagesState
+
+llm = init_chat_model("anthropic:claude-opus-5-5")
+
+SYSTEM = SystemMessage("Bạn là trợ lý chăm sóc khách hàng của shop Kiệt Store. "
+                       "Trả lời ngắn gọn, thân thiện, bằng tiếng Việt.")
+
+def goi_llm(state: MessagesState):
+    tra_loi = llm.invoke([SYSTEM] + state["messages"])
+    return {"messages": [tra_loi]}
+
+builder = StateGraph(MessagesState)
+builder.add_node("goi_llm", goi_llm)
+builder.add_edge(START, "goi_llm")
+builder.add_edge("goi_llm", END)
+graph = builder.compile()
+
+ket_qua = graph.invoke({"messages": [HumanMessage("Shop có giao hàng ra Đà Nẵng không?")]})
+print(ket_qua["messages"][-1].text)</code></pre>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ python chatbot.py
+Dạ có ạ! Kiệt Store giao hàng toàn quốc, bao gồm Đà Nẵng. Thời gian giao thường 2–4 ngày làm việc.
+Bạn cần mình hỗ trợ đặt hàng hay kiểm tra phí ship không ạ?</pre></div>
+    <div class="callout warning" data-title="Để ý chỗ này"><p>Bot vừa <strong>bịa</strong> “2–4 ngày làm việc” — nó không hề biết chính sách thật của shop. LLM trả lời trôi chảy ngay cả khi không có dữ liệu. Bài 7 sửa đúng vấn đề này bằng tool: cho bot tra cứu dữ liệu thật thay vì đoán.</p></div>
+
+    <h2>Trò chuyện nhiều lượt</h2>
+    <p>Muốn bot nhớ câu trước, phải gửi lại cả hội thoại. Tạm thời làm tay bằng một vòng lặp — bài 8 sẽ để LangGraph tự lo việc này:</p>
+<pre data-file="chatbot.py (thay phần chạy)"><code class="language-python">messages = []
+while True:
+    cau_hoi = input("Bạn: ")
+    if cau_hoi in ("q", "thoat"):
+        break
+    messages.append(HumanMessage(cau_hoi))
+    ket_qua = graph.invoke({"messages": messages})
+    messages = ket_qua["messages"]          # giữ lại cả hội thoại cho lượt sau
+    print("Bot:", messages[-1].text)</code></pre>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ python chatbot.py
+Bạn: Mình tên Kiệt, mình muốn hỏi về đổi size áo.
+Bot: Chào Kiệt! Bạn muốn đổi sang size nào, và đơn hàng đã nhận được bao lâu rồi ạ?
+Bạn: Mình tên gì nhỉ?
+Bot: Bạn tên Kiệt ạ.
+Bạn: q</pre></div>
+
+    <h2>Hiện chữ chạy từng token</h2>
+    <p>Model trả lời dài thì người dùng phải chờ vài giây nhìn màn hình trống. Với <code>stream_mode="messages"</code>, LangGraph đưa ra từng mẩu chữ ngay khi model sinh:</p>
+<pre><code class="language-python">for manh, meta in graph.stream({"messages": [HumanMessage("Gợi ý 3 cách phối áo sơ mi trắng")]},
+                               stream_mode="messages"):
+    print(manh.text, end="", flush=True)</code></pre>
+    <ul>
+      <li>Mỗi lần lặp nhận một cặp: <code>manh</code> (một mẩu tin nhắn, vài chữ) và <code>meta</code> (thông tin kèm theo, ví dụ <code>meta["langgraph_node"]</code> cho biết mẩu này từ node nào).</li>
+      <li><code>end="", flush=True</code> — in nối tiếp trên cùng dòng và hiện ngay, tạo hiệu ứng chữ chạy.</li>
+    </ul>
+    <p>Đây chính là cách các giao diện chat hiển thị câu trả lời. Khi gắn vào web (FastAPI…), mình gửi từng mẩu này về trình duyệt.</p>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Vì sao không lưu SystemMessage vào state?</summary><p>Không cần: ghép lúc gọi là đủ, state gọn hơn và sửa system prompt có hiệu lực ngay. Lưu vào state thì mỗi lượt có thể bị nhân đôi nếu ghép sai.</p></details>
+      <details><summary>Model “nhớ” câu trước bằng cách nào?</summary><p>Nó không nhớ gì giữa các lần gọi. Mình gửi lại toàn bộ danh sách tin nhắn mỗi lần, nên nó đọc được ngữ cảnh.</p></details>
+      <details><summary>stream_mode="messages" trả về gì mỗi lần lặp?</summary><p>Một cặp (mẩu tin nhắn, metadata) — mẩu chứa vài token vừa sinh.</p></details>
+    </div>
+  </section>
+
+  <section class="lesson" id="re-nhanh" data-part="1 · Cốt lõi" data-title="Rẽ nhánh: conditional edge" data-minutes="12" data-practice="30" data-updated="2026-11-15" data-done="false" data-summary="Cho graph tự chọn đường đi theo dữ liệu trong state, và tạo vòng lặp.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><code>add_conditional_edges("node_nguồn", ham_chon)</code>: chạy xong node nguồn thì gọi <code>ham_chon(state)</code>, nó <strong>trả về tên node</strong> sẽ chạy tiếp.</li>
+        <li>Hàm chọn chỉ <em>đọc</em> state và quyết định, không sửa state.</li>
+        <li>Edge trỏ ngược về node trước = <strong>vòng lặp</strong>. Agent ở bài 7 chính là như vậy.</li>
+      </ul>
+    </div>
+
+    <h2>Vấn đề: không phải câu hỏi nào cũng đi cùng một đường</h2>
+    <p>Trợ lý CSKH nhận đủ loại câu: hỏi đơn hàng, đòi hoàn tiền, hỏi linh tinh. Mỗi loại cần xử lý khác: hoàn tiền phải chuyển nhân viên, hỏi đơn phải tra cứu. Edge cố định (<code>add_edge</code>) chỉ đi một đường. Cần edge biết <strong>rẽ</strong>.</p>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 230" role="img" aria-label="Node phân loại rẽ sang ba nhánh"><defs><marker id="lg6h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="lg6a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="box" x="10" y="96" width="76" height="38" rx="19"/><text x="48" y="120" text-anchor="middle" class="m">START</text>
+<rect class="acc" x="120" y="88" width="150" height="54" rx="8"/><text x="195" y="111" text-anchor="middle" class="b m">phan_loai</text><text x="195" y="129" text-anchor="middle" class="s">ghi loai vào state</text>
+<rect class="zone" x="300" y="84" width="104" height="62" rx="31"/><text x="352" y="111" text-anchor="middle" class="s b">chon_nhanh</text><text x="352" y="127" text-anchor="middle" class="s">đọc loai</text>
+<rect class="box" x="450" y="12" width="170" height="46" rx="8"/><text x="535" y="40" text-anchor="middle" class="m">xu_ly_don_hang</text>
+<rect class="warn" x="450" y="92" width="170" height="46" rx="8"/><text x="535" y="120" text-anchor="middle" class="m">xu_ly_hoan_tien</text>
+<rect class="box" x="450" y="172" width="170" height="46" rx="8"/><text x="535" y="200" text-anchor="middle" class="m">tra_loi_chung</text>
+<rect class="box" x="650" y="96" width="62" height="38" rx="19"/><text x="681" y="120" text-anchor="middle" class="m">END</text>
+<path class="ln" d="M86,115 H116" marker-end="url(#lg6h)"/><path class="ln" d="M270,115 H296" marker-end="url(#lg6h)"/>
+<path class="ln-a dash" d="M404,108 L446,40" marker-end="url(#lg6a)"/><text x="402" y="72" class="s a" text-anchor="end">"don_hang"</text>
+<path class="ln-a dash" d="M404,115 H446" marker-end="url(#lg6a)"/>
+<path class="ln-a dash" d="M404,122 L446,192" marker-end="url(#lg6a)"/><text x="402" y="168" class="s a" text-anchor="end">còn lại</text>
+<path class="ln" d="M620,35 L656,104" marker-end="url(#lg6h)"/><path class="ln" d="M620,115 H646" marker-end="url(#lg6h)"/><path class="ln" d="M620,195 L656,128" marker-end="url(#lg6h)"/>
+</svg><figcaption>Đường nét đứt là conditional edge: hàm chon_nhanh đọc state rồi trả về tên node chạy tiếp.</figcaption></figure>
+
+    <h2>Viết từng bước</h2>
+    <h3>Bước 1 — State và node phân loại</h3>
+<pre data-file="phan_loai.py" data-add="1-14"><code class="language-python">from typing import TypedDict, Literal
+from langgraph.graph import StateGraph, START, END
+
+class State(TypedDict):
+    cau_hoi: str
+    loai: str
+    tra_loi: str
+
+def phan_loai(state: State):
+    q = state["cau_hoi"].lower()
+    if "hoàn tiền" in q:
+        return {"loai": "hoan_tien"}
+    if "đơn" in q:
+        return {"loai": "don_hang"}
+    return {"loai": "khac"}</code></pre>
+    <p>Phân loại bằng từ khóa cho dễ hiểu và chạy không cần API key. Thực tế sẽ để LLM phân loại (xem cuối bài) — nhưng graph giữ nguyên.</p>
+
+    <h3>Bước 2 — Ba node xử lý</h3>
+<pre data-file="phan_loai.py (thêm tiếp)" data-add="1-8"><code class="language-python">def xu_ly_don_hang(state: State):
+    return {"tra_loi": "Để mình tra cứu đơn hàng cho bạn."}
+
+def xu_ly_hoan_tien(state: State):
+    return {"tra_loi": "Yêu cầu hoàn tiền đã được chuyển cho nhân viên."}
+
+def tra_loi_chung(state: State):
+    return {"tra_loi": "Mình có thể giúp gì thêm cho bạn?"}</code></pre>
+
+    <h3>Bước 3 — Hàm chọn đường</h3>
+<pre data-file="phan_loai.py (thêm tiếp)" data-add="1-6"><code class="language-python">def chon_nhanh(state: State) -> Literal["xu_ly_don_hang", "xu_ly_hoan_tien", "tra_loi_chung"]:
+    if state["loai"] == "don_hang":
+        return "xu_ly_don_hang"
+    if state["loai"] == "hoan_tien":
+        return "xu_ly_hoan_tien"
+    return "tra_loi_chung"</code></pre>
+    <ul>
+      <li>Hàm chọn đọc state và <strong>trả về tên node</strong> (chuỗi). Nó không phải node — không được trả về dict cập nhật state.</li>
+      <li>Kiểu trả về <code>Literal[...]</code> liệt kê các đích có thể. Không bắt buộc để chạy, nhưng nhờ nó LangGraph biết vẽ đủ các nhánh trong sơ đồ.</li>
+    </ul>
+
+    <h3>Bước 4 — Nối graph</h3>
+<pre data-file="phan_loai.py (thêm tiếp)" data-add="7"><code class="language-python">builder = StateGraph(State)
+builder.add_node("phan_loai", phan_loai)
+builder.add_node("xu_ly_don_hang", xu_ly_don_hang)
+builder.add_node("xu_ly_hoan_tien", xu_ly_hoan_tien)
+builder.add_node("tra_loi_chung", tra_loi_chung)
+builder.add_edge(START, "phan_loai")
+builder.add_conditional_edges("phan_loai", chon_nhanh)
+for ten in ["xu_ly_don_hang", "xu_ly_hoan_tien", "tra_loi_chung"]:
+    builder.add_edge(ten, END)
+graph = builder.compile()
+
+for cau_hoi in ["Đơn DH001 tới đâu rồi?", "Mình muốn hoàn tiền đơn DH002", "Shop mở cửa mấy giờ?"]:
+    for buoc in graph.stream({"cau_hoi": cau_hoi}, stream_mode="updates"):
+        print(buoc)
+    print("---")</code></pre>
+    <p>Dòng được tô là điểm mới duy nhất: <em>“chạy xong <code>phan_loai</code> thì hỏi <code>chon_nhanh</code> xem đi đâu tiếp”</em>.</p>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ python phan_loai.py
+{'phan_loai': {'loai': 'don_hang'}}
+{'<span class="hl">xu_ly_don_hang</span>': {'tra_loi': 'Để mình tra cứu đơn hàng cho bạn.'}}
+---
+{'phan_loai': {'loai': 'hoan_tien'}}
+{'<span class="hl">xu_ly_hoan_tien</span>': {'tra_loi': 'Yêu cầu hoàn tiền đã được chuyển cho nhân viên.'}}
+---
+{'phan_loai': {'loai': 'khac'}}
+{'<span class="hl">tra_loi_chung</span>': {'tra_loi': 'Mình có thể giúp gì thêm cho bạn?'}}
+---</pre></div>
+    <p>Cùng một graph, ba câu hỏi đi ba đường khác nhau. Output <code>updates</code> cho thấy rõ node nào đã chạy.</p>
+    <p>Sơ đồ Mermaid vẽ conditional edge bằng nét đứt <code>-.-&gt;</code>:</p>
+    <div class="term" data-title="python — trong REPL"><pre>&gt;&gt;&gt; print(graph.get_graph().draw_mermaid())
+...
+	__start__ --&gt; phan_loai;
+	phan_loai -.-&gt; tra_loi_chung;
+	phan_loai -.-&gt; xu_ly_don_hang;
+	phan_loai -.-&gt; xu_ly_hoan_tien;
+...</pre></div>
+
+    <h2>Vòng lặp: edge trỏ ngược</h2>
+    <p>Hàm chọn có thể trả về tên một node <em>đã chạy</em> — graph quay lại đó. Ví dụ “thử lại tối đa 3 lần”:</p>
+<pre><code class="language-python">def kiem_tra(state: State) -> Literal["goi_api", "__end__"]:
+    if state["thanh_cong"] or state["so_lan"] >= 3:
+        return END              # END chính là chuỗi "__end__"
+    return "goi_api"            # quay lại thử tiếp
+
+builder.add_conditional_edges("goi_api", kiem_tra)</code></pre>
+    <p>Đây là mẩu ghép cuối cùng để hiểu agent: <strong>agent = node LLM + conditional edge “còn cần gọi tool không?” trỏ ngược về chính nó</strong>. Bài sau làm đúng như vậy.</p>
+    <div class="callout warning" data-title="Mình đã bị dính chỗ này"><p>Vòng lặp luôn cần điều kiện dừng. LangGraph có giới hạn số bước (<code>recursion_limit</code>) và báo <code>GraphRecursionError</code> khi vượt — nhưng ở bản 1.2 mặc định là khoảng <strong>10.000 bước</strong>. Với agent gọi LLM, 10.000 bước là rất nhiều tiền API trước khi nó chịu dừng. Nên tự đặt thấp khi chạy: <code>graph.invoke(dau_vao, {"recursion_limit": 25})</code>. (Tài liệu cũ hay ghi mặc định là 25 — đã không còn đúng.)</p></div>
+
+    <h2>Để LLM phân loại thay vì từ khóa</h2>
+    <p>Từ khóa dễ sai (“không cần hoàn tiền đâu” cũng chứa “hoàn tiền”). Thực tế dùng LLM với <strong>structured output</strong> — bắt model trả về đúng một giá trị trong danh sách:</p>
+<pre><code class="language-python">from pydantic import BaseModel
+
+class PhanLoai(BaseModel):
+    loai: Literal["don_hang", "hoan_tien", "khac"]
+
+bo_phan_loai = llm.with_structured_output(PhanLoai)
+
+def phan_loai(state: State):
+    kq = bo_phan_loai.invoke(f"Phân loại câu hỏi của khách: {state['cau_hoi']}")
+    return {"loai": kq.loai}</code></pre>
+    <p>Chỉ node <code>phan_loai</code> đổi ruột; hàm chọn, các node khác và graph giữ nguyên. Đây là lợi ích của việc tách thành node: thay một mảnh không ảnh hưởng phần còn lại.</p>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Hàm chọn trả về gì, và có được sửa state không?</summary><p>Trả về tên node chạy tiếp (hoặc END). Không sửa state — việc đó là của node.</p></details>
+      <details><summary>Vì sao nên khai kiểu Literal[...] cho hàm chọn?</summary><p>Để LangGraph biết các đích có thể có, vẽ sơ đồ đúng và phát hiện sớm tên node sai.</p></details>
+      <details><summary>Graph lặp mãi không dừng thì chuyện gì xảy ra?</summary><p>Tới recursion_limit (mặc định khoảng 10.000 ở bản 1.2) thì dừng và báo GraphRecursionError. Nên tự đặt recursion_limit thấp, ví dụ 25, cho agent.</p></details>
+    </div>
+  </section>
+
+  <section class="lesson" id="tool-agent" data-part="1 · Cốt lõi" data-title="Tool và vòng lặp agent" data-minutes="18" data-practice="40" data-updated="2026-11-15" data-done="false" data-summary="Cho LLM gọi hàm Python để lấy dữ liệu thật: @tool, bind_tools, ToolNode và vòng lặp agent.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li>LLM <strong>không tự chạy code</strong>. Nó chỉ trả lời “hãy gọi hàm X với tham số Y”; code của mình chạy hàm rồi gửi kết quả lại.</li>
+        <li><code>@tool</code> biến hàm Python thành tool — <strong>docstring chính là hướng dẫn cho LLM</strong>.</li>
+        <li>Agent = node LLM ⇄ <code>ToolNode</code>, nối bằng <code>tools_condition</code>: còn yêu cầu gọi tool thì sang tools, không thì kết thúc.</li>
+        <li>Vòng lặp này có tên chuẩn là <strong>ReAct</strong> (Reason + Act) — pattern agent phổ biến nhất. Bài 11 đặt nó cạnh các pattern khác.</li>
+      </ul>
+    </div>
+
+    <h2>Tool calling hoạt động thế nào</h2>
+    <p>Bài 5 bot bịa thời gian giao hàng vì không có dữ liệu. Cách sửa: cho nó một “công cụ” tra cứu. Điều mình từng hiểu sai: LLM <em>không</em> gọi hàm Python được. Thứ thực sự diễn ra là một cuộc trao đổi:</p>
+    <ol>
+      <li>Mình gửi câu hỏi kèm <strong>danh sách tool</strong> (tên, mô tả, tham số).</li>
+      <li>LLM đọc và trả về một <code>AIMessage</code> đặc biệt: không có chữ, chỉ có <code>tool_calls</code> — <em>“hãy gọi <code>tra_cuu_don_hang</code> với <code>ma_don="DH001"</code>”</em>.</li>
+      <li><strong>Code của mình</strong> chạy hàm thật, gói kết quả vào <code>ToolMessage</code>.</li>
+      <li>Gửi lại cho LLM cả hội thoại + kết quả. LLM đọc và trả lời khách — hoặc xin gọi thêm tool khác.</li>
+    </ol>
+    <p>Bước 3 → 4 có thể lặp nhiều lần. Đó là lý do cần vòng lặp, và LangGraph xử lý nó gọn gàng.</p>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 240" role="img" aria-label="Vòng lặp agent giữa node agent và node tools"><defs><marker id="lg7h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="lg7a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="box" x="10" y="96" width="76" height="38" rx="19"/><text x="48" y="120" text-anchor="middle" class="m">START</text>
+<rect class="acc" x="130" y="80" width="170" height="70" rx="8"/><text x="215" y="106" text-anchor="middle" class="b m">agent</text><text x="215" y="124" text-anchor="middle" class="s">gọi LLM (có danh sách tool)</text><text x="215" y="140" text-anchor="middle" class="s">trả về AIMessage</text>
+<rect class="zone" x="340" y="84" width="120" height="62" rx="31"/><text x="400" y="111" text-anchor="middle" class="s b">tools_condition</text><text x="400" y="127" text-anchor="middle" class="s">có tool_calls?</text>
+<rect class="warn" x="510" y="12" width="190" height="66" rx="8"/><text x="605" y="36" text-anchor="middle" class="b m">tools (ToolNode)</text><text x="605" y="54" text-anchor="middle" class="s">chạy hàm Python thật</text><text x="605" y="70" text-anchor="middle" class="s">trả về ToolMessage</text>
+<rect class="box" x="560" y="170" width="90" height="38" rx="19"/><text x="605" y="194" text-anchor="middle" class="m">END</text>
+<path class="ln" d="M86,115 H126" marker-end="url(#lg7h)"/><path class="ln" d="M300,115 H336" marker-end="url(#lg7h)"/>
+<path class="ln-a dash" d="M460,104 L506,58" marker-end="url(#lg7a)"/><text x="470" y="66" class="s a">có</text>
+<path class="ln dash" d="M460,126 L556,182" marker-end="url(#lg7h)"/><text x="440" y="190" class="s">không → xong</text>
+<path class="ln-a" d="M510,30 H215 V76" marker-end="url(#lg7a)"/><text x="360" y="24" class="s a" text-anchor="middle">gửi kết quả lại cho LLM</text>
+</svg><figcaption>Agent chỉ là graph hai node có vòng lặp. LLM quyết định khi nào thoát vòng lặp bằng cách trả lời mà không gọi tool.</figcaption></figure>
+
+    <h2>Bước 1 — Viết tool</h2>
+<pre data-file="agent.py" data-add="1-11"><code class="language-python">from langchain_core.tools import tool
+
+DON_HANG = {   # dữ liệu giả, thực tế là truy vấn database
+    "DH001": {"trang_thai": "đang giao", "du_kien": "17/11"},
+    "DH002": {"trang_thai": "đã giao", "du_kien": "12/11"},
+}
+
+@tool
+def tra_cuu_don_hang(ma_don: str) -> dict:
+    """Tra cứu trạng thái đơn hàng theo mã đơn, ví dụ DH001."""
+    return DON_HANG.get(ma_don.upper(), {"loi": "không tìm thấy đơn"})</code></pre>
+    <p><code>@tool</code> đọc ba thứ từ hàm để tạo “bản mô tả” gửi cho LLM: <strong>tên hàm</strong>, <strong>docstring</strong>, <strong>tham số và kiểu</strong>. Kiểm tra xem nó hiểu gì:</p>
+    <div class="term" data-title="python — trong REPL"><pre>&gt;&gt;&gt; tra_cuu_don_hang.name
+'tra_cuu_don_hang'
+&gt;&gt;&gt; tra_cuu_don_hang.description
+'Tra cứu trạng thái đơn hàng theo mã đơn, ví dụ DH001.'
+&gt;&gt;&gt; tra_cuu_don_hang.args
+{'ma_don': {'title': 'Ma Don', 'type': 'string'}}
+&gt;&gt;&gt; tra_cuu_don_hang.invoke({"ma_don": "DH001"})
+{'trang_thai': 'đang giao', 'du_kien': '17/11'}</pre></div>
+    <div class="callout tip" data-title="Mình ghi nhớ thế này"><p><strong>Docstring là prompt.</strong> LLM chọn tool nào và truyền tham số gì hoàn toàn dựa vào tên + docstring. Docstring mơ hồ (“xử lý đơn”) thì LLM gọi sai. Viết như đang dặn một nhân viên mới: tool làm gì, khi nào dùng, tham số trông như thế nào.</p></div>
+
+    <h2>Bước 2 — Node agent: LLM biết có tool</h2>
+<pre data-file="agent.py (thêm tiếp)" data-add="1-10"><code class="language-python">from langchain.chat_models import init_chat_model
+from langgraph.graph import StateGraph, START, MessagesState
+
+tools = [tra_cuu_don_hang]
+llm = init_chat_model("anthropic:claude-opus-5-5")
+llm_co_tool = llm.bind_tools(tools)
+
+def agent(state: MessagesState):
+    tra_loi = llm_co_tool.invoke(state["messages"])
+    return {"messages": [tra_loi]}</code></pre>
+    <p><code>bind_tools(tools)</code> tạo một phiên bản model mà mỗi lần gọi sẽ gửi kèm mô tả các tool. Node <code>agent</code> giống hệt node chatbot ở bài 5 — chỉ khác là model giờ có thể trả về yêu cầu gọi tool.</p>
+
+    <h2>Bước 3 — ToolNode và tools_condition</h2>
+    <p>Hai mảnh dựng sẵn của LangGraph, mình không phải tự viết:</p>
+<pre data-file="agent.py (thêm tiếp)" data-add="1,5,7-8"><code class="language-python">from langgraph.prebuilt import ToolNode, tools_condition
+
+builder = StateGraph(MessagesState)
+builder.add_node("agent", agent)
+builder.add_node("tools", ToolNode(tools))
+builder.add_edge(START, "agent")
+builder.add_conditional_edges("agent", tools_condition)
+builder.add_edge("tools", "agent")
+graph = builder.compile()</code></pre>
+    <ul>
+      <li><code>ToolNode(tools)</code> — node đọc <code>tool_calls</code> trong tin nhắn cuối, chạy đúng hàm với đúng tham số, trả về các <code>ToolMessage</code>. Lỗi trong tool được bắt và gửi lại cho LLM dưới dạng tin nhắn lỗi.</li>
+      <li><code>tools_condition</code> — hàm chọn đường có sẵn: tin nhắn cuối có <code>tool_calls</code> → đi <code>"tools"</code>; không có → <code>END</code>. (Vì vậy node tool phải đặt tên đúng là <code>"tools"</code>.)</li>
+      <li><code>add_edge("tools", "agent")</code> — <strong>edge trỏ ngược</strong>: chạy tool xong quay lại cho LLM đọc kết quả. Đây là vòng lặp.</li>
+    </ul>
+    <p>So với bài 6: chỉ là một conditional edge và một edge vòng lại. Không có gì mới — đó là cái hay khi đã nắm chắc nền.</p>
+
+    <h2>Bước 4 — Chạy và đọc từng bước</h2>
+<pre data-file="agent.py (thêm tiếp)"><code class="language-python">from langchain_core.messages import HumanMessage
+
+dau_vao = {"messages": [HumanMessage("Đơn DH001 của mình tới đâu rồi?")]}
+for buoc in graph.stream(dau_vao, {"recursion_limit": 25}, stream_mode="updates"):
+    for node, cap_nhat in buoc.items():
+        print(f"--- node: {node}")
+        for m in cap_nhat["messages"]:
+            m.pretty_print()</code></pre>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ python agent.py
+--- node: <span class="hl">agent</span>
+================================== Ai Message ==================================
+Tool Calls:
+  tra_cuu_don_hang (toolu_01Hq...)
+ Call ID: toolu_01Hq...
+  Args:
+    ma_don: DH001
+--- node: <span class="hl">tools</span>
+================================= Tool Message =================================
+Name: tra_cuu_don_hang
+
+{"trang_thai": "đang giao", "du_kien": "17/11"}
+--- node: <span class="hl">agent</span>
+================================== Ai Message ==================================
+
+Đơn DH001 của bạn đang được giao, dự kiến tới nơi ngày 17/11 ạ.</pre></div>
+    <p>Đọc output theo đúng vòng lặp trong sơ đồ:</p>
+    <ol>
+      <li><strong>agent</strong> lần 1: LLM không trả lời ngay mà xin gọi <code>tra_cuu_don_hang(ma_don="DH001")</code> — tự trích được mã đơn từ câu hỏi.</li>
+      <li><code>tools_condition</code> thấy có tool_calls → sang <strong>tools</strong>: ToolNode chạy hàm, ra dữ liệu thật.</li>
+      <li>Quay lại <strong>agent</strong> lần 2: LLM đọc kết quả, trả lời bằng chữ, không gọi tool nữa → <code>tools_condition</code> chọn END.</li>
+    </ol>
+    <p>Lần này ngày giao là <strong>17/11 — lấy từ dữ liệu</strong>, không còn bịa.</p>
+    <div class="callout note" data-title="Vòng lặp này có tên: ReAct"><p>Cái mình vừa dựng được gọi là một <strong>ReAct agent</strong> — <em>Reason + Act</em>: LLM <strong>suy nghĩ</strong> xem cần gì → <strong>hành động</strong> (gọi tool) → <strong>quan sát</strong> kết quả → lặp lại tới khi trả lời được. Khi tài liệu, blog hay đồng nghiệp nói “ReAct agent”, họ nói đúng vòng <code>agent ⇄ tools</code> này. Bài 11 so sánh nó với các pattern khác như routing, plan-and-execute, reflection.</p></div>
+
+    <h2>Thí nghiệm: câu hỏi không cần tool</h2>
+    <p>Hỏi “Chào shop!” và xem output: chỉ có một bước <code>agent</code> rồi kết thúc. LLM tự hiểu không cần tra cứu. Agent không đi một đường cố định — nó đi bao nhiêu vòng tùy câu hỏi.</p>
+
+    <h2>Nhìn bên trong yêu cầu gọi tool</h2>
+    <div class="term" data-title="python — trong REPL"><pre>&gt;&gt;&gt; ket_qua = graph.invoke(dau_vao)
+&gt;&gt;&gt; msg = ket_qua["messages"][1]      <span class="cm"># AIMessage đầu tiên</span>
+&gt;&gt;&gt; msg.tool_calls
+[{'name': 'tra_cuu_don_hang', 'args': {'ma_don': 'DH001'}, 'id': 'toolu_01Hq...', 'type': 'tool_call'}]</pre></div>
+    <p>Mỗi yêu cầu có <code>id</code>; <code>ToolMessage</code> trả về mang cùng id đó để LLM ghép đúng kết quả với yêu cầu — quan trọng khi LLM gọi nhiều tool một lúc.</p>
+    <div class="callout warning"><p>Nhớ đặt <code>recursion_limit</code> thấp cho agent (như <code>25</code> ở trên). Nếu tool liên tục trả lỗi, LLM có thể gọi đi gọi lại — mỗi vòng là một lần trả tiền API.</p></div>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Ai thực sự chạy hàm tra_cuu_don_hang: LLM hay code của mình?</summary><p>Code của mình (ToolNode). LLM chỉ trả về yêu cầu gọi hàm kèm tham số.</p></details>
+      <details><summary>LLM dựa vào đâu để chọn tool và tham số?</summary><p>Tên hàm, docstring và kiểu tham số mà @tool đọc ra và gửi kèm mỗi lần gọi.</p></details>
+      <details><summary>Bỏ dòng add_edge("tools", "agent") thì sao?</summary><p>Chạy tool xong không quay lại LLM, nên không có câu trả lời cuối cho khách — vòng lặp bị cắt.</p></details>
+    </div>
+  </section>
+
+  <section class="lesson" id="bo-nho" data-part="1 · Cốt lõi" data-title="Bộ nhớ: checkpointer và thread" data-minutes="12" data-practice="25" data-updated="2026-11-15" data-done="false" data-summary="Để LangGraph tự lưu hội thoại theo từng khách, xem lại state và lưu xuống ổ đĩa.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><strong>Checkpointer</strong> lưu state sau mỗi bước. Gắn khi compile: <code>compile(checkpointer=...)</code>.</li>
+        <li>Mỗi cuộc hội thoại là một <strong>thread</strong>, phân biệt bằng <code>thread_id</code> trong config.</li>
+        <li>Có checkpointer thì mỗi lượt chỉ cần gửi <strong>tin nhắn mới</strong> — lịch sử tự được nạp lại.</li>
+      </ul>
+    </div>
+
+    <h2>Vấn đề: mỗi lần invoke là một tờ giấy trắng</h2>
+    <p>Bài 5 mình tự giữ biến <code>messages</code> và gửi lại cả hội thoại mỗi lượt. Với một server phục vụ nghìn khách, phải tự lưu hội thoại của từng người vào đâu đó, nạp lại đúng người… Checkpointer làm việc này.</p>
+
+    <h2>Thêm bộ nhớ vào agent — 2 dòng</h2>
+<pre data-file="agent.py" data-add="1,8"><code class="language-python">from langgraph.checkpoint.memory import InMemorySaver
+
+builder = StateGraph(MessagesState)
+builder.add_node("agent", agent)
+builder.add_node("tools", ToolNode(tools))
+builder.add_edge(START, "agent")
+builder.add_conditional_edges("agent", tools_condition)
+builder.add_edge("tools", "agent")
+graph = builder.compile(checkpointer=InMemorySaver())</code></pre>
+    <p><code>InMemorySaver</code> lưu trong RAM — mất khi tắt chương trình, đủ để học và test. Khi chạy, truyền <code>thread_id</code> qua config:</p>
+<pre data-file="agent.py (phần chạy)" data-add="1"><code class="language-python">config = {"configurable": {"thread_id": "khach-01"}}
+
+graph.invoke({"messages": [HumanMessage("Đơn DH001 của mình tới đâu rồi?")]}, config)
+ket_qua = graph.invoke({"messages": [HumanMessage("Nhắc lại giúp mình vừa hỏi gì?")]}, config)
+ket_qua["messages"][-1].pretty_print()
+print("số tin nhắn trong thread:", len(ket_qua["messages"]))</code></pre>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ python agent.py
+================================== Ai Message ==================================
+
+Bạn vừa hỏi về đơn DH001 — đơn đang giao, dự kiến tới nơi 17/11 ạ.
+số tin nhắn trong thread: <span class="hl">6</span></pre></div>
+    <p>Lượt hai mình chỉ gửi <strong>một</strong> tin nhắn mới, nhưng thread có 6 tin: 4 tin của lượt đầu (câu hỏi, yêu cầu gọi tool, kết quả tool, câu trả lời) + câu hỏi mới + câu trả lời mới. Checkpointer đã tự nạp lịch sử của <code>khach-01</code>, rồi reducer <code>add_messages</code> nối tin mới vào.</p>
+
+    <h2>Thread: mỗi khách một cuộc hội thoại</h2>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 210" role="img" aria-label="Checkpointer lưu state riêng cho từng thread"><defs><marker id="lg8h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker></defs>
+<rect class="acc" x="10" y="74" width="150" height="62" rx="8"/><text x="85" y="100" text-anchor="middle" class="b">graph</text><text x="85" y="118" text-anchor="middle" class="s">compile(checkpointer)</text>
+<rect class="zone" x="210" y="8" width="502" height="194" rx="12"/><text x="226" y="32" class="b">Checkpointer</text><text x="320" y="32" class="s">InMemorySaver / SqliteSaver / PostgresSaver</text>
+<rect class="ok" x="226" y="46" width="470" height="64" rx="8"/><text x="240" y="68" class="b m">thread_id = "khach-01"</text><text x="240" y="88" class="s">bước 1 → bước 2 → bước 3 → … → state mới nhất (6 tin nhắn)</text><text x="240" y="103" class="s">Kiệt hỏi đơn DH001</text>
+<rect class="ok" x="226" y="122" width="470" height="64" rx="8"/><text x="240" y="144" class="b m">thread_id = "khach-02"</text><text x="240" y="164" class="s">bước 1 → state mới nhất (2 tin nhắn)</text><text x="240" y="179" class="s">một khách khác, không thấy gì của khach-01</text>
+<path class="ln" d="M160,96 L222,78" marker-end="url(#lg8h)"/><path class="ln" d="M160,114 L222,152" marker-end="url(#lg8h)"/>
+</svg><figcaption>Cùng một graph phục vụ nhiều khách: thread_id quyết định nạp lịch sử nào.</figcaption></figure>
+    <p>Thử hỏi bằng thread khác:</p>
+    <div class="term" data-title="python — trong REPL"><pre>&gt;&gt;&gt; kq = graph.invoke({"messages": [HumanMessage("Mình vừa hỏi gì?")]},
+...                   {"configurable": {"thread_id": "khach-02"}})
+&gt;&gt;&gt; print(kq["messages"][-1].text)
+Đây là tin nhắn đầu tiên của bạn trong cuộc trò chuyện này, nên mình chưa thấy câu hỏi nào trước đó ạ.</pre></div>
+    <p>Thực tế, <code>thread_id</code> thường là id phiên chat hoặc id khách + id cuộc trò chuyện lấy từ database của mình.</p>
+
+    <h2>Xem state đã lưu</h2>
+    <div class="term" data-title="python — trong REPL"><pre>&gt;&gt;&gt; snap = graph.get_state({"configurable": {"thread_id": "khach-01"}})
+&gt;&gt;&gt; len(snap.values["messages"])
+6
+&gt;&gt;&gt; snap.next
+()</pre></div>
+    <ul>
+      <li><code>snap.values</code> — state hiện tại của thread.</li>
+      <li><code>snap.next</code> — các node sẽ chạy tiếp. <code>()</code> là graph đã chạy xong. Ở bài 9, khi graph dừng chờ duyệt, ô này sẽ có giá trị.</li>
+      <li><code>graph.get_state_history(config)</code> — mọi bản lưu qua từng bước, dùng để debug hoặc “quay ngược thời gian”.</li>
+    </ul>
+
+    <h2>Lưu xuống ổ đĩa: SqliteSaver</h2>
+    <p><code>InMemorySaver</code> mất hết khi tắt chương trình. Muốn còn sau khi khởi động lại, dùng checkpointer lưu vào database:</p>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ uv pip install langgraph-checkpoint-sqlite</pre></div>
+<pre data-file="agent.py" data-add="1,3-4"><code class="language-python">from langgraph.checkpoint.sqlite import SqliteSaver
+
+with SqliteSaver.from_conn_string("bo_nho.db") as checkpointer:
+    graph = builder.compile(checkpointer=checkpointer)
+    # ... chạy graph như cũ, trong khối with</code></pre>
+    <p>Chạy, tắt, chạy lại với cùng <code>thread_id</code> — bot vẫn nhớ. Production thường dùng <code>PostgresSaver</code> (gói <code>langgraph-checkpoint-postgres</code>), cách dùng y hệt (Phần 2).</p>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Có checkpointer rồi, mỗi lượt nên gửi gì vào invoke?</summary><p>Chỉ tin nhắn mới, kèm config có thread_id. Lịch sử được nạp tự động.</p></details>
+      <details><summary>Hai khách dùng chung một graph, làm sao không lẫn hội thoại?</summary><p>Mỗi khách (mỗi cuộc trò chuyện) một thread_id riêng.</p></details>
+      <details><summary>snap.next bằng () nghĩa là gì?</summary><p>Thread đó đã chạy xong, không còn node nào chờ chạy.</p></details>
+    </div>
+  </section>
+
+  <section class="lesson" id="cho-duyet" data-part="1 · Cốt lõi" data-title="Dừng chờ người duyệt: interrupt" data-minutes="15" data-practice="30" data-updated="2026-11-15" data-done="false" data-summary="Tạm dừng graph giữa chừng để người thật quyết định, rồi chạy tiếp đúng chỗ đã dừng.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><code>interrupt(gia_tri)</code> trong node: <strong>dừng graph</strong>, gửi <code>gia_tri</code> ra ngoài cho người xem.</li>
+        <li>Chạy tiếp bằng <code>graph.invoke(Command(resume=quyet_dinh), config)</code> — <code>interrupt(...)</code> trả về chính <code>quyet_dinh</code>.</li>
+        <li>Bắt buộc có <strong>checkpointer</strong> và <strong>thread_id</strong> (để nhớ đã dừng ở đâu).</li>
+        <li>Khi chạy tiếp, node bị dừng <strong>chạy lại từ dòng đầu</strong>.</li>
+      </ul>
+    </div>
+
+    <h2>Vấn đề: có việc không được để AI tự làm</h2>
+    <p>Hoàn tiền, xóa dữ liệu, gửi email cho khách… sai một lần là mất tiền hoặc mất uy tín. Cần một bước: graph <strong>dừng lại</strong>, nhân viên xem đề xuất, bấm duyệt hoặc từ chối, rồi graph <strong>chạy tiếp đúng chỗ đó</strong> — có thể là vài phút hay vài giờ sau, ở một request HTTP khác. Mô hình này gọi là <em>human-in-the-loop</em>.</p>
+
+    <h2>Ví dụ: duyệt hoàn tiền</h2>
+    <p>Chưa cần LLM — một graph hai node: xin duyệt → hoàn tiền.</p>
+<pre data-file="duyet.py" data-add="3,11-15"><code class="language-python">from typing import TypedDict
+from langgraph.graph import StateGraph, START, END
+from langgraph.types import interrupt, Command
+from langgraph.checkpoint.memory import InMemorySaver
+
+class State(TypedDict):
+    ma_don: str
+    so_tien: int
+    ket_qua: str
+
+def xin_duyet(state: State):
+    print(">> node xin_duyet bắt đầu chạy")
+    quyet_dinh = interrupt({"cau_hoi": f"Duyệt hoàn {state['so_tien']:,}đ cho đơn {state['ma_don']}?"})
+    print(">> nhận quyết định:", quyet_dinh)
+    return {"ket_qua": "da_duyet" if quyet_dinh == "dong_y" else "tu_choi"}
+
+def hoan_tien(state: State):
+    if state["ket_qua"] != "da_duyet":
+        return {"ket_qua": "Không hoàn tiền."}
+    return {"ket_qua": f"Đã hoàn {state['so_tien']:,}đ cho đơn {state['ma_don']}."}
+
+builder = StateGraph(State)
+builder.add_node("xin_duyet", xin_duyet)
+builder.add_node("hoan_tien", hoan_tien)
+builder.add_edge(START, "xin_duyet")
+builder.add_edge("xin_duyet", "hoan_tien")
+builder.add_edge("hoan_tien", END)
+graph = builder.compile(checkpointer=InMemorySaver())</code></pre>
+    <p>Dòng 13 là tâm điểm: <code>interrupt(...)</code> trông như một lời gọi hàm bình thường trả về <code>quyet_dinh</code>. Nhưng lần chạy đầu, nó <strong>không trả về</strong> — graph dừng ngay tại đó. Giá trị truyền vào <code>interrupt</code> (câu hỏi cần duyệt) được gửi ra ngoài.</p>
+
+    <h3>Lần chạy 1: tới chỗ cần duyệt thì dừng</h3>
+<pre data-file="duyet.py (phần chạy)"><code class="language-python">config = {"configurable": {"thread_id": "hoan-tien-01"}}
+
+ket_qua = graph.invoke({"ma_don": "DH002", "so_tien": 350000}, config)
+print(ket_qua)
+print("đang dừng ở:", graph.get_state(config).next)</code></pre>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ python duyet.py
+&gt;&gt; node xin_duyet bắt đầu chạy
+{'ma_don': 'DH002', 'so_tien': 350000, <span class="hl">'__interrupt__'</span>: [Interrupt(value={'cau_hoi': 'Duyệt hoàn 350,000đ cho đơn DH002?'}, id='ded14caa...')]}
+đang dừng ở: <span class="hl">('xin_duyet',)</span></pre></div>
+    <ul>
+      <li>Dòng “nhận quyết định” <strong>không</strong> được in — node dừng ở <code>interrupt</code>.</li>
+      <li>Kết quả có thêm khóa <code>__interrupt__</code> chứa giá trị gửi ra (câu hỏi cần duyệt). App của mình đọc nó để hiện lên màn hình nhân viên.</li>
+      <li><code>next</code> là <code>('xin_duyet',)</code>: graph đang treo ở node này, state đã lưu trong checkpointer.</li>
+    </ul>
+
+    <h3>Lần chạy 2: nhân viên duyệt, chạy tiếp</h3>
+<pre><code class="language-python">ket_qua = graph.invoke(Command(resume="dong_y"), config)
+print(ket_qua)</code></pre>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ python duyet.py
+&gt;&gt; node xin_duyet bắt đầu chạy       <span class="cm"># chạy lại từ đầu node!</span>
+&gt;&gt; nhận quyết định: <span class="ok">dong_y</span>
+{'ma_don': 'DH002', 'so_tien': 350000, 'ket_qua': 'Đã hoàn 350,000đ cho đơn DH002.'}</pre></div>
+    <p><code>Command(resume="dong_y")</code> với <strong>cùng thread_id</strong>: LangGraph nạp state đã lưu, chạy lại node <code>xin_duyet</code>, lần này <code>interrupt(...)</code> trả về <code>"dong_y"</code>, graph đi tiếp tới <code>hoan_tien</code>. Giá trị resume có thể là bất cứ gì: chuỗi, dict (<code>{"duyet": True, "ghi_chu": "..."}</code>)…</p>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 190" role="img" aria-label="Dòng thời gian interrupt và resume"><defs><marker id="lg9h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker></defs>
+<path class="ln" d="M20,60 H700" marker-end="url(#lg9h)"/><text x="700" y="50" class="s" text-anchor="end">thời gian</text>
+<rect class="acc" x="20" y="80" width="190" height="54" rx="8"/><text x="34" y="102" class="b">invoke lần 1</text><text x="34" y="122" class="s">chạy tới interrupt → dừng</text>
+<rect class="warn" x="250" y="80" width="200" height="54" rx="8"/><text x="264" y="102" class="b">chờ người duyệt</text><text x="264" y="122" class="s">vài phút… vài giờ; state ở checkpointer</text>
+<rect class="ok" x="490" y="80" width="210" height="54" rx="8"/><text x="504" y="102" class="b">Command(resume=…)</text><text x="504" y="122" class="s">node chạy lại, interrupt trả về</text>
+<text x="20" y="166" class="s">trả về __interrupt__ cho app hiển thị</text><text x="490" y="166" class="s">cùng thread_id → tiếp tục đúng chỗ</text>
+</svg><figcaption>Interrupt tách một lần chạy thành hai nửa; checkpointer giữ state ở giữa.</figcaption></figure>
+
+    <div class="callout warning" data-title="Cái bẫy: node chạy lại từ đầu"><p>Để ý dòng “node xin_duyet bắt đầu chạy” in ra <strong>hai lần</strong>. Khi resume, LangGraph chạy lại cả node từ dòng đầu, không tiếp tục giữa chừng. Vì vậy mọi việc có tác dụng phụ (ghi database, gửi email, trừ tiền) <strong>đặt sau</strong> <code>interrupt</code>, hoặc tách ra node riêng như <code>hoan_tien</code> ở trên. Nếu đặt trước, nó sẽ chạy hai lần.</p></div>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Vì sao interrupt bắt buộc phải có checkpointer?</summary><p>Graph phải lưu state lúc dừng để lần resume (có thể ở request khác, lúc khác) nạp lại và chạy tiếp.</p></details>
+      <details><summary>Resume thì node chứa interrupt chạy tiếp từ giữa hay từ đầu?</summary><p>Từ đầu node. Lần này interrupt trả về giá trị resume thay vì dừng.</p></details>
+      <details><summary>Một node gửi email thông báo rồi mới gọi interrupt xin duyệt. Lỗi gì sẽ xảy ra?</summary><p>Email bị gửi hai lần: một lần lúc chạy tới interrupt, một lần khi node chạy lại lúc resume. Nên gửi sau interrupt hoặc tách node.</p></details>
+    </div>
+  </section>
+
+  <section class="lesson" id="dung-tro-ly" data-part="1 · Cốt lõi" data-title="Ghép lại: trợ lý CSKH từ số 0" data-minutes="25" data-practice="50" data-updated="2026-11-15" data-done="false" data-summary="Tự viết từng phần một agent tra cứu đơn và hoàn tiền có bước duyệt, nhớ hội thoại theo từng khách.">
+    <div class="callout note" data-title="Mục tiêu bài này">
+      <p>Viết từ đầu file <code>tro_ly_cskh.py</code>: agent tra cứu đơn hàng, đề xuất hoàn tiền nhưng <strong>dừng chờ nhân viên duyệt</strong>, nhớ hội thoại theo từng khách. Mỗi bước thêm một mảnh, chạy thử rồi mới đi tiếp. Cuối bài là file hoàn chỉnh — khuôn cho mọi agent sau này.</p>
+    </div>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 250" role="img" aria-label="Kiến trúc trợ lý CSKH"><defs><marker id="lg10h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="lg10a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="box" x="10" y="20" width="110" height="50" rx="8"/><text x="65" y="42" text-anchor="middle" class="b">Khách</text><text x="65" y="60" text-anchor="middle" class="s">nhắn tin</text>
+<rect class="acc" x="170" y="12" width="170" height="66" rx="8"/><text x="255" y="36" text-anchor="middle" class="b m">agent</text><text x="255" y="54" text-anchor="middle" class="s">Claude + system prompt</text><text x="255" y="70" text-anchor="middle" class="s">+ 2 tool</text>
+<rect class="zone" x="390" y="8" width="322" height="150" rx="12"/><text x="406" y="30" class="b m">tools (ToolNode)</text>
+<rect class="ok" x="406" y="42" width="290" height="44" rx="8"/><text x="420" y="61" class="b m">tra_cuu_don_hang</text><text x="420" y="77" class="s">đọc dữ liệu, chạy ngay</text>
+<rect class="warn" x="406" y="98" width="290" height="48" rx="8"/><text x="420" y="117" class="b m">hoan_tien</text><text x="420" y="134" class="s">gọi interrupt() → chờ nhân viên duyệt</text>
+<rect class="box" x="470" y="186" width="230" height="52" rx="8"/><text x="585" y="208" text-anchor="middle" class="b">Nhân viên</text><text x="585" y="226" text-anchor="middle" class="s">Command(resume="dong_y")</text>
+<rect class="zone" x="10" y="120" width="330" height="118" rx="12"/><text x="26" y="142" class="b">Checkpointer</text><text x="26" y="164" class="s">lưu state theo thread_id</text><text x="26" y="182" class="s">• nhớ hội thoại từng khách</text><text x="26" y="200" class="s">• giữ chỗ dừng khi chờ duyệt</text>
+<path class="ln" d="M120,45 H166" marker-end="url(#lg10h)"/>
+<path class="ln-a" d="M340,36 H386" marker-end="url(#lg10a)"/><path class="ln-a" d="M386,60 H344" marker-end="url(#lg10a)"/>
+<path class="ln dash" d="M551,184 V150" marker-end="url(#lg10h)"/>
+<path class="ln dash" d="M255,78 V116" marker-end="url(#lg10h)"/>
+</svg><figcaption>Toàn bộ kiến thức Phần 1 trong một app: vòng lặp agent, hai tool, interrupt trong tool, checkpointer.</figcaption></figure>
+
+    <h2>Bước 1 — Dữ liệu và tool tra cứu</h2>
+<pre data-file="tro_ly_cskh.py" data-add="1-12"><code class="language-python">from langchain_core.tools import tool
+
+DON_HANG = {
+    "DH001": {"trang_thai": "đang giao", "tong_tien": 520000},
+    "DH002": {"trang_thai": "đã giao", "tong_tien": 350000},
+}
+
+@tool
+def tra_cuu_don_hang(ma_don: str) -> dict:
+    """Tra cứu trạng thái và tổng tiền của đơn hàng theo mã đơn (dạng DH001).
+    Luôn dùng tool này trước khi trả lời bất cứ điều gì về một đơn hàng."""
+    return DON_HANG.get(ma_don.upper(), {"loi": "không tìm thấy đơn"})</code></pre>
+    <p>Docstring dặn rõ <em>khi nào</em> dùng tool, không chỉ <em>làm gì</em> — để LLM không trả lời đoán về đơn hàng.</p>
+
+    <h2>Bước 2 — Tool hoàn tiền có bước duyệt</h2>
+<pre data-file="tro_ly_cskh.py (thêm tiếp)" data-add="1,3-12"><code class="language-python">from langgraph.types import interrupt
+
+@tool
+def hoan_tien(ma_don: str, so_tien: int, ly_do: str) -> str:
+    """Hoàn tiền cho một đơn hàng. Chỉ dùng sau khi đã tra cứu đơn và số tiền
+    không vượt quá tổng tiền của đơn. Cần nhân viên duyệt trước khi thực hiện."""
+    quyet_dinh = interrupt({"hanh_dong": "hoan_tien", "ma_don": ma_don,
+                            "so_tien": so_tien, "ly_do": ly_do})
+    if quyet_dinh != "dong_y":
+        return "Nhân viên đã từ chối yêu cầu hoàn tiền."
+    # gọi API thanh toán thật ở đây — đặt SAU interrupt
+    return f"Đã hoàn {so_tien:,}đ cho đơn {ma_don}."</code></pre>
+    <p>Điểm hay: <code>interrupt</code> đặt được <strong>ngay trong tool</strong>. LLM cứ tự nhiên quyết định gọi <code>hoan_tien</code>; tới lúc thực thi thì graph dừng chờ người. Kết quả trả về cho LLM (“đã hoàn” hay “bị từ chối”) để nó báo lại khách cho đúng.</p>
+
+    <h2>Bước 3 — Model, system prompt, node agent</h2>
+<pre data-file="tro_ly_cskh.py (thêm tiếp)" data-add="1-13"><code class="language-python">from langchain.chat_models import init_chat_model
+from langchain_core.messages import SystemMessage
+from langgraph.graph import StateGraph, START, MessagesState
+
+tools = [tra_cuu_don_hang, hoan_tien]
+llm = init_chat_model("anthropic:claude-opus-5-5").bind_tools(tools)
+
+SYSTEM = SystemMessage(
+    "Bạn là trợ lý chăm sóc khách hàng của Kiệt Store. Trả lời ngắn gọn, lịch sự, bằng tiếng Việt. "
+    "Luôn tra cứu đơn trước khi trả lời hay xử lý hoàn tiền. Không hứa điều gì ngoài dữ liệu tra được.")
+
+def agent(state: MessagesState):
+    return {"messages": [llm.invoke([SYSTEM] + state["messages"])]}</code></pre>
+
+    <h2>Bước 4 — Graph với vòng lặp và bộ nhớ</h2>
+<pre data-file="tro_ly_cskh.py (thêm tiếp)" data-add="1-10"><code class="language-python">from langgraph.prebuilt import ToolNode, tools_condition
+from langgraph.checkpoint.memory import InMemorySaver
+
+builder = StateGraph(MessagesState)
+builder.add_node("agent", agent)
+builder.add_node("tools", ToolNode(tools))
+builder.add_edge(START, "agent")
+builder.add_conditional_edges("agent", tools_condition)
+builder.add_edge("tools", "agent")
+graph = builder.compile(checkpointer=InMemorySaver())</code></pre>
+    <p>Giống hệt agent bài 7, thêm checkpointer của bài 8. Không có gì mới — đó là mục đích của bài này.</p>
+
+    <h2>Bước 5 — Hàm chạy: hiện tiến trình và xử lý chờ duyệt</h2>
+<pre data-file="tro_ly_cskh.py (thêm tiếp)" data-add="1-27"><code class="language-python">from langchain_core.messages import HumanMessage
+from langgraph.types import Command
+
+def chay(dau_vao, config):
+    """Chạy graph, in từng bước. Trả về yêu cầu duyệt nếu graph dừng."""
+    for buoc in graph.stream(dau_vao, config, stream_mode="updates"):
+        for node, cap_nhat in buoc.items():
+            if node == "__interrupt__":
+                return cap_nhat[0].value               # graph đang chờ duyệt
+            for m in cap_nhat["messages"]:
+                if m.type == "ai" and m.tool_calls:
+                    print(f"[{node}] gọi tool:", [(t["name"], t["args"]) for t in m.tool_calls])
+                else:
+                    print(f"[{node}] {m.type}: {m.text}")
+    return None
+
+if __name__ == "__main__":
+    config = {"configurable": {"thread_id": "khach-02"}, "recursion_limit": 25}
+    while True:
+        cau_hoi = input("\nKhách: ")
+        if cau_hoi == "q":
+            break
+        cho_duyet = chay({"messages": [HumanMessage(cau_hoi)]}, config)
+        while cho_duyet:                                # có thể cần duyệt nhiều lần
+            print("⏸  CẦN DUYỆT:", cho_duyet)
+            quyet_dinh = input("Nhân viên (dong_y / tu_choi): ")
+            cho_duyet = chay(Command(resume=quyet_dinh), config)</code></pre>
+    <ul>
+      <li>Khi graph dừng, <code>stream</code> trả về một mẩu có khóa <code>__interrupt__</code> — mình bắt nó và trả về giá trị cần duyệt.</li>
+      <li>Vòng <code>while cho_duyet</code>: hỏi nhân viên, resume, và lặp nếu agent lại cần duyệt thêm việc khác.</li>
+      <li>Trong app thật, phần <code>input()</code> của nhân viên là một nút bấm trên trang quản trị, gửi request kèm <code>thread_id</code> và quyết định.</li>
+    </ul>
+
+    <h2>Chạy thử</h2>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ python tro_ly_cskh.py
+
+Khách: Đơn DH002 bị lỗi, hoàn tiền giúp mình
+[agent] gọi tool: [('tra_cuu_don_hang', {'ma_don': 'DH002'})]
+[tools] tool: {"trang_thai": "đã giao", "tong_tien": 350000}
+[agent] gọi tool: [('hoan_tien', {'ma_don': 'DH002', 'so_tien': 350000, 'ly_do': 'sản phẩm bị lỗi'})]
+<span class="hl">⏸  CẦN DUYỆT: {'hanh_dong': 'hoan_tien', 'ma_don': 'DH002', 'so_tien': 350000, 'ly_do': 'sản phẩm bị lỗi'}</span>
+Nhân viên (dong_y / tu_choi): dong_y
+[tools] tool: <span class="ok">Đã hoàn 350,000đ cho đơn DH002.</span>
+[agent] ai: Mình đã hoàn 350.000đ cho đơn DH002. Tiền sẽ về tài khoản của bạn trong vài ngày làm việc ạ.
+
+Khách: Vậy tổng cộng mình được hoàn bao nhiêu?
+[agent] ai: Bạn được hoàn 350.000đ cho đơn DH002 ạ.</pre></div>
+    <p>Đọc output là thấy đủ kiến thức cả phần: agent tự tra cứu trước (bài 7), tự trích số tiền từ dữ liệu tra được, gọi <code>hoan_tien</code> thì dừng chờ duyệt (bài 9), sau khi duyệt mới thực hiện và báo khách; câu hỏi sau trả lời được nhờ nhớ hội thoại (bài 8).</p>
+
+    <h2>Thử các tình huống</h2>
+    <table>
+      <thead><tr><th>Thử</th><th>Kỳ vọng</th></tr></thead>
+      <tbody>
+        <tr><td>Nhân viên gõ <code>tu_choi</code></td><td>Agent báo khách yêu cầu bị từ chối, không có dòng “đã hoàn”.</td></tr>
+        <tr><td>Hỏi đơn <code>DH999</code></td><td>Tool trả “không tìm thấy đơn”, agent hỏi lại khách mã đơn.</td></tr>
+        <tr><td>“Hoàn cho mình 1 triệu đơn DH002”</td><td>Agent tra cứu thấy tổng 350.000đ, không đề xuất hoàn quá số đó (nhờ docstring + system prompt).</td></tr>
+        <tr><td>Đổi <code>thread_id</code></td><td>Như khách mới, không nhớ gì.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Checklist cho mọi agent</h2>
+    <ul>
+      <li>Docstring tool nói rõ <em>làm gì</em> và <em>khi nào dùng</em>.</li>
+      <li>Việc có rủi ro (tiền, xóa, gửi ra ngoài) đi qua <code>interrupt</code>; tác dụng phụ đặt <strong>sau</strong> interrupt.</li>
+      <li>Có checkpointer; production dùng Sqlite/Postgres thay vì RAM.</li>
+      <li>Đặt <code>recursion_limit</code> thấp.</li>
+      <li>System prompt cấm trả lời đoán ngoài dữ liệu tool.</li>
+    </ul>
+    <div class="callout tip" data-title="Còn một bài nữa"><p>Tới đây mình tự dựng được phần lớn agent thực tế. Bài 11 lùi lại một bước để <strong>gọi tên</strong> những gì đã dựng (app này là <em>ReAct + human-in-the-loop</em>) và biết <strong>chọn pattern</strong> nào cho bài toán khác.</p></div>
+  </section>
+
+  <section class="lesson" id="pattern-agent" data-part="1 · Cốt lõi" data-title="Bản đồ pattern: chọn kiến trúc nào cho bài toán" data-minutes="15" data-practice="30" data-updated="2026-11-16" data-done="false" data-summary="Workflow hay agent, tên chuẩn của các pattern (ReAct, routing, plan-and-execute, reflection…) và cách chọn.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li>Câu hỏi đầu tiên khi thiết kế: <strong>ai quyết định đường đi?</strong> Code quyết định → <strong>workflow</strong>. LLM quyết định → <strong>agent</strong>.</li>
+        <li>Các pattern có tên chuẩn: <strong>prompt chaining, routing, parallelization, ReAct, plan-and-execute, reflection, supervisor, human-in-the-loop</strong>. Mỗi cái chỉ là một cách nối node và edge đã học.</li>
+        <li>Bắt đầu từ pattern <strong>đơn giản nhất</strong> giải được bài toán. Chỉ lên agent khi thật sự không biết trước các bước.</li>
+      </ul>
+    </div>
+    <p>Mười bài trước dạy <em>cách dựng</em>. Bài này dạy <em>gọi tên</em> những gì đã dựng và <em>chọn</em> giữa chúng. Khi đọc tài liệu, xem blog, đi phỏng vấn hay bàn thiết kế với team, mọi người nói bằng các tên pattern — biết tên là theo kịp cuộc nói chuyện, và biết hỏi AI đúng từ khóa.</p>
+
+    <h2>Workflow hay agent: ai cầm lái?</h2>
+    <p>Mọi app LLM nằm đâu đó trên một dải:</p>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 200" role="img" aria-label="Dải từ workflow tới agent"><defs><marker id="sp1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker></defs>
+<path class="ln" d="M40,60 H680" marker-end="url(#sp1)"/><path class="ln" d="M680,60 H40" marker-end="url(#sp1)"/>
+<text x="40" y="40" class="b">Workflow</text><text x="40" y="84" class="s">code quyết định đường đi</text>
+<text x="680" y="40" class="b" text-anchor="end">Agent</text><text x="680" y="84" class="s" text-anchor="end">LLM quyết định bước tiếp theo</text>
+<rect class="box" x="30" y="104" width="300" height="86" rx="8"/>
+<text x="44" y="126" class="s">+ đoán trước được, dễ test, rẻ, nhanh</text><text x="44" y="146" class="s">− chỉ xử lý được các trường hợp đã lường trước</text><text x="44" y="170" class="s m">chaining · routing · parallel · reflection</text>
+<rect class="acc" x="390" y="104" width="300" height="86" rx="8"/>
+<text x="404" y="126" class="s">+ linh hoạt với yêu cầu không biết trước</text><text x="404" y="146" class="s">− khó đoán, tốn token, khó debug hơn</text><text x="404" y="170" class="s m">ReAct · plan-and-execute · supervisor</text>
+</svg><figcaption>Không có bên nào “tốt hơn”. Trợ lý CSKH ở bài 10 là agent; còn bài 6 (phân loại câu hỏi) là workflow.</figcaption></figure>
+    <p>Phân biệt rất đơn giản: nhìn vào chỗ chọn node tiếp theo. Nếu là hàm Python <code>if/else</code> do mình viết (như <code>chon_nhanh</code> ở bài 6) → workflow. Nếu là LLM tự quyết có gọi tool không, gọi tool nào (như <code>tools_condition</code> đọc <code>tool_calls</code> ở bài 7) → agent.</p>
+    <div class="callout tip" data-title="Mình hiểu sai lúc đầu"><p>Mình từng nghĩ “dùng LLM” là “làm agent”. Không phải. Một workflow có thể gọi LLM ở mọi node (bài 5, bài 6 bản structured output) mà vẫn là workflow, vì đường đi do code quyết. Nhiều bài toán thực tế giải tốt nhất bằng workflow — rẻ hơn, ổn định hơn, dễ test hơn.</p></div>
+
+    <h2>Bản đồ pattern</h2>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 400" role="img" aria-label="Bản đồ sáu pattern agent phổ biến"><defs><marker id="pgh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="pga" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="zone" x="8" y="8" width="228" height="186" rx="10"/>
+<text x="20" y="30" class="b">Prompt chaining</text>
+<rect class="box" x="164" y="17" width="62" height="18" rx="9"/>
+<text x="195" y="30" class="s" text-anchor="middle">workflow</text>
+<rect class="acc" x="20" y="84" width="58" height="32" rx="6"/>
+<text x="49" y="104" class="s" text-anchor="middle">bước 1</text>
+<rect class="acc" x="92" y="84" width="58" height="32" rx="6"/>
+<text x="121" y="104" class="s" text-anchor="middle">bước 2</text>
+<rect class="acc" x="164" y="84" width="58" height="32" rx="6"/>
+<text x="193" y="104" class="s" text-anchor="middle">bước 3</text>
+<path class="ln" d="M78,100 H88" marker-end="url(#pgh)"/>
+<path class="ln" d="M150,100 H160" marker-end="url(#pgh)"/>
+<text x="20" y="182" class="s">chuỗi bước cố định · bài 3</text>
+<rect class="zone" x="246" y="8" width="228" height="186" rx="10"/>
+<text x="258" y="30" class="b">Routing</text>
+<rect class="box" x="402" y="17" width="62" height="18" rx="9"/>
+<text x="433" y="30" class="s" text-anchor="middle">workflow</text>
+<rect class="acc" x="258" y="88" width="74" height="32" rx="6"/>
+<text x="295" y="108" class="s" text-anchor="middle">phân loại</text>
+<rect class="box" x="388" y="52" width="74" height="28" rx="6"/>
+<text x="425" y="70" class="s" text-anchor="middle">nhánh A</text>
+<path class="ln-a dash" d="M332,104 L384,66" marker-end="url(#pga)"/>
+<rect class="box" x="388" y="92" width="74" height="28" rx="6"/>
+<text x="425" y="110" class="s" text-anchor="middle">nhánh B</text>
+<path class="ln-a dash" d="M332,104 L384,106" marker-end="url(#pga)"/>
+<rect class="box" x="388" y="132" width="74" height="28" rx="6"/>
+<text x="425" y="150" class="s" text-anchor="middle">nhánh C</text>
+<path class="ln-a dash" d="M332,104 L384,146" marker-end="url(#pga)"/>
+<text x="258" y="182" class="s">rẽ theo loại yêu cầu · bài 6</text>
+<rect class="zone" x="484" y="8" width="228" height="186" rx="10"/>
+<text x="496" y="30" class="b">Parallelization</text>
+<rect class="box" x="640" y="17" width="62" height="18" rx="9"/>
+<text x="671" y="30" class="s" text-anchor="middle">workflow</text>
+<rect class="acc" x="494" y="88" width="50" height="32" rx="6"/>
+<text x="519" y="108" class="s" text-anchor="middle">chia</text>
+<rect class="ok" x="650" y="88" width="50" height="32" rx="6"/>
+<text x="675" y="108" class="s" text-anchor="middle">gộp</text>
+<rect class="box" x="572" y="54" width="50" height="26" rx="6"/>
+<text x="597" y="71" class="s" text-anchor="middle">việc</text>
+<path class="ln" d="M544,104 L568,67" marker-end="url(#pgh)"/>
+<path class="ln" d="M622,67 L646,104" marker-end="url(#pgh)"/>
+<rect class="box" x="572" y="92" width="50" height="26" rx="6"/>
+<text x="597" y="109" class="s" text-anchor="middle">việc</text>
+<path class="ln" d="M544,104 L568,105" marker-end="url(#pgh)"/>
+<path class="ln" d="M622,105 L646,104" marker-end="url(#pgh)"/>
+<rect class="box" x="572" y="130" width="50" height="26" rx="6"/>
+<text x="597" y="147" class="s" text-anchor="middle">việc</text>
+<path class="ln" d="M544,104 L568,143" marker-end="url(#pgh)"/>
+<path class="ln" d="M622,143 L646,104" marker-end="url(#pgh)"/>
+<text x="496" y="182" class="s">chạy song song rồi gộp · Phần 2</text>
+<rect class="zone" x="8" y="204" width="228" height="186" rx="10"/>
+<text x="20" y="226" class="b">ReAct</text>
+<rect class="acc" x="164" y="213" width="62" height="18" rx="9"/>
+<text x="195" y="226" class="s" text-anchor="middle">agent</text>
+<rect class="acc" x="24" y="274" width="74" height="36" rx="6"/>
+<text x="61" y="297" class="b" text-anchor="middle">LLM</text>
+<rect class="warn" x="148" y="274" width="74" height="36" rx="6"/>
+<text x="185" y="297" class="b" text-anchor="middle">tool</text>
+<path class="ln-a" d="M78,274 C98,248 148,248 168,270" marker-end="url(#pga)"/>
+<text x="123" y="250" class="s a" text-anchor="middle">gọi</text>
+<path class="ln-a" d="M168,310 C148,332 98,332 78,314" marker-end="url(#pga)"/>
+<text x="123" y="340" class="s a" text-anchor="middle">kết quả</text>
+<path class="ln" d="M38,310 V354" marker-end="url(#pgh)"/>
+<text x="46" y="354" class="s">xong</text>
+<text x="20" y="378" class="s">lặp suy nghĩ – gọi tool · bài 7</text>
+<rect class="zone" x="246" y="204" width="228" height="186" rx="10"/>
+<text x="258" y="226" class="b">Plan-and-execute</text>
+<rect class="acc" x="402" y="213" width="62" height="18" rx="9"/>
+<text x="433" y="226" class="s" text-anchor="middle">agent</text>
+<rect class="acc" x="258" y="250" width="92" height="32" rx="6"/>
+<text x="304" y="270" class="s" text-anchor="middle">lập kế hoạch</text>
+<rect class="box" x="370" y="244" width="92" height="62" rx="6"/>
+<text x="380" y="262" class="s m">1. …</text>
+<text x="380" y="278" class="s m">2. …</text>
+<text x="380" y="294" class="s m">3. …</text>
+<path class="ln" d="M350,266 H366" marker-end="url(#pgh)"/>
+<rect class="acc" x="258" y="320" width="92" height="32" rx="6"/>
+<text x="304" y="340" class="s" text-anchor="middle">làm 1 bước</text>
+<path class="ln-a" d="M416,306 V336 H354" marker-end="url(#pga)"/>
+<path class="ln-a dash" d="M266,352 V362 H254 V328 H256" marker-end="url(#pga)"/>
+<text x="368" y="354" class="s">lặp tới hết</text>
+<text x="258" y="378" class="s">lập kế hoạch trước · bài này</text>
+<rect class="zone" x="484" y="204" width="228" height="186" rx="10"/>
+<text x="496" y="226" class="b">Reflection</text>
+<rect class="box" x="640" y="213" width="62" height="18" rx="9"/>
+<text x="671" y="226" class="s" text-anchor="middle">workflow</text>
+<rect class="acc" x="500" y="274" width="74" height="36" rx="6"/>
+<text x="537" y="297" class="b" text-anchor="middle">viết</text>
+<rect class="ok" x="624" y="274" width="74" height="36" rx="6"/>
+<text x="661" y="297" class="b" text-anchor="middle">chấm</text>
+<path class="ln" d="M574,292 H620" marker-end="url(#pgh)"/>
+<path class="ln-a dash" d="M661,310 C654,340 554,340 539,314" marker-end="url(#pga)"/>
+<text x="599" y="344" class="s a" text-anchor="middle">chưa đạt → sửa</text>
+<path class="ln" d="M684,274 V248" marker-end="url(#pgh)"/>
+<text x="690" y="256" class="s">đạt</text>
+<text x="496" y="378" class="s">viết – chấm – sửa · bài này</text>
+</svg><figcaption>Sáu pattern hay gặp nhất. Nhãn góc phải: <em>workflow</em> — code quyết định đường đi; <em>agent</em> — LLM tự quyết định bước tiếp theo.</figcaption></figure>
+    <table>
+      <thead><tr><th>Pattern</th><th>Ý tưởng</th><th>Ví dụ trong app CSKH</th><th>Học ở</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Prompt chaining</strong></td><td>Chuỗi bước cố định, bước sau dùng kết quả bước trước.</td><td>Tóm tắt khiếu nại → dịch sang tiếng Anh → gửi đội kỹ thuật.</td><td>Bài 3</td></tr>
+        <tr><td><strong>Routing</strong></td><td>Phân loại đầu vào rồi rẽ sang nhánh chuyên trách.</td><td>Câu hỏi đơn hàng / hoàn tiền / chung.</td><td>Bài 6</td></tr>
+        <tr><td><strong>Parallelization</strong> (map-reduce)</td><td>Nhiều việc độc lập chạy cùng lúc rồi gộp.</td><td>Tóm tắt 50 đánh giá sản phẩm song song rồi tổng hợp.</td><td>Phần 2 · Chạy song song</td></tr>
+        <tr><td><strong>ReAct</strong></td><td>LLM lặp: suy nghĩ → gọi tool → đọc kết quả → … tới khi trả lời được.</td><td>Trợ lý tra cứu đơn rồi trả lời.</td><td>Bài 7</td></tr>
+        <tr><td><strong>Plan-and-execute</strong></td><td>LLM lập kế hoạch nhiều bước trước, rồi làm lần lượt từng bước.</td><td>Xử lý khiếu nại phức tạp cần nhiều bước kiểm tra.</td><td>Bài này</td></tr>
+        <tr><td><strong>Reflection</strong> (evaluator–optimizer)</td><td>Một bước viết, một bước chấm theo tiêu chí, lặp tới khi đạt.</td><td>Soạn tin nhắn xin lỗi khách đạt chuẩn của shop.</td><td>Bài này</td></tr>
+        <tr><td><strong>Supervisor</strong> (orchestrator–workers)</td><td>Một agent điều phối chia việc cho các agent chuyên trách.</td><td>Điều phối giữa agent đơn hàng, agent kỹ thuật, agent kế toán.</td><td>Phần 2 · Multi-agent</td></tr>
+        <tr><td><strong>Human-in-the-loop</strong></td><td>Dừng chờ người duyệt ở bước rủi ro.</td><td>Duyệt hoàn tiền.</td><td>Bài 9</td></tr>
+      </tbody>
+    </table>
+    <p>Các pattern <strong>ghép với nhau</strong> được: app bài 10 là ReAct + human-in-the-loop; một hệ thống lớn có thể là routing ở cửa vào, mỗi nhánh là một ReAct agent, nhánh soạn thư có thêm reflection.</p>
+
+    <h2>ReAct: tên của vòng lặp ở bài 7</h2>
+    <p><strong>ReAct</strong> = <em>Reason + Act</em> (suy luận + hành động), đặt tên theo một bài báo năm 2022. Ý tưởng gốc: cho LLM xen kẽ ba thứ — <strong>Thought</strong> (nghĩ xem cần làm gì), <strong>Action</strong> (gọi một công cụ), <strong>Observation</strong> (đọc kết quả) — lặp lại tới khi đủ thông tin để trả lời.</p>
+    <p>Hồi đó người ta phải ép LLM viết ra chữ “Thought: … Action: …” rồi tự cắt chuỗi để biết nó muốn gọi gì. Ngày nay model hỗ trợ <strong>tool calling</strong> sẵn (trả về <code>tool_calls</code> có cấu trúc), nên ReAct chỉ còn là đúng cái vòng lặp <code>agent ⇄ tools</code> ở bài 7. Khi tài liệu nói “ReAct agent”, cứ hiểu là: <em>một LLM có tool, lặp tới khi không gọi tool nữa</em>. Hàm <code>create_agent</code> ở Phần 2 dựng sẵn đúng một ReAct agent.</p>
+    <p><strong>Dùng khi</strong>: không biết trước cần gọi tool nào, bao nhiêu lần. <strong>Không dùng khi</strong>: các bước đã biết trước — dùng chaining/routing, rẻ và ổn định hơn.</p>
+
+    <h2>Plan-and-execute: lập kế hoạch trước, làm sau</h2>
+    <p>ReAct quyết định từng bước một, “đi tới đâu tính tới đó”. Với việc dài nhiều bước, nó dễ đi lạc hoặc quên mục tiêu. <strong>Plan-and-execute</strong> tách làm hai vai:</p>
+    <ul>
+      <li><strong>Planner</strong>: đọc yêu cầu, viết ra danh sách bước.</li>
+      <li><strong>Executor</strong>: làm lần lượt từng bước (mỗi bước có thể là một ReAct agent nhỏ có tool), ghi kết quả lại.</li>
+    </ul>
+    <p>Lợi ích: kế hoạch hiện ra rõ ràng (cho người duyệt trước được!), executor có thể dùng model rẻ hơn, dễ biết đang ở bước nào.</p>
+
+    <h3>Bước 1 — State và planner</h3>
+<pre data-file="plan_execute.py" data-add="1-20"><code class="language-python">import operator
+from typing import TypedDict, Annotated
+from pydantic import BaseModel
+from langchain.chat_models import init_chat_model
+from langgraph.graph import StateGraph, START, END
+
+llm = init_chat_model("anthropic:claude-opus-5-5")
+
+class KeHoach(BaseModel):
+    buoc: list[str]
+
+class State(TypedDict):
+    yeu_cau: str
+    ke_hoach: list[str]                              # các bước CÒN LẠI
+    da_lam: Annotated[list[str], operator.add]       # nhật ký, nối thêm (bài 4)
+
+def lap_ke_hoach(state: State):
+    kh = llm.with_structured_output(KeHoach).invoke(
+        f"Lập kế hoạch tối đa 4 bước để xử lý yêu cầu: {state['yeu_cau']}")
+    return {"ke_hoach": kh.buoc}</code></pre>
+    <p>Structured output (bài 6) bắt LLM trả về đúng một danh sách bước, không phải đoạn văn tự do.</p>
+
+    <h3>Bước 2 — Executor và vòng lặp</h3>
+<pre data-file="plan_execute.py (thêm tiếp)" data-add="1-16"><code class="language-python">def thuc_hien(state: State):
+    buoc = state["ke_hoach"][0]                       # lấy bước đầu tiên còn lại
+    kq = llm.invoke(f"Yêu cầu: {state['yeu_cau']}\nĐã làm: {state['da_lam']}\nLàm bước: {buoc}")
+    return {"ke_hoach": state["ke_hoach"][1:],        # bỏ bước vừa làm
+            "da_lam": [f"{buoc} → {kq.text}"]}
+
+def con_buoc(state: State):
+    return "thuc_hien" if state["ke_hoach"] else END
+
+builder = StateGraph(State)
+builder.add_node("lap_ke_hoach", lap_ke_hoach)
+builder.add_node("thuc_hien", thuc_hien)
+builder.add_edge(START, "lap_ke_hoach")
+builder.add_edge("lap_ke_hoach", "thuc_hien")
+builder.add_conditional_edges("thuc_hien", con_buoc, ["thuc_hien", END])
+graph = builder.compile()</code></pre>
+    <p>Vòng lặp <code>thuc_hien → thuc_hien</code> chạy tới khi hết bước — đúng cơ chế vòng lặp của bài 6. Tham số thứ ba <code>["thuc_hien", END]</code> liệt kê các đích có thể (thay cho kiểu <code>Literal</code>).</p>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ python plan_execute.py      <span class="cm"># stream_mode="updates", yêu cầu: "Đơn DH002 còn đổi trả được không?"</span>
+{'<span class="hl">lap_ke_hoach</span>': {'ke_hoach': ['Tra cứu đơn DH002', 'Kiểm tra chính sách đổi trả 7 ngày', 'Soạn câu trả lời cho khách']}}
+{'<span class="hl">thuc_hien</span>': {'ke_hoach': ['Kiểm tra chính sách đổi trả 7 ngày', 'Soạn câu trả lời cho khách'], 'da_lam': ['Tra cứu đơn DH002 → Đơn DH002 giao ngày 12/11, tổng 350.000đ.']}}
+{'<span class="hl">thuc_hien</span>': {'ke_hoach': ['Soạn câu trả lời cho khách'], 'da_lam': ['Kiểm tra chính sách đổi trả 7 ngày → Đơn giao 12/11, hôm nay 16/11: còn trong hạn 7 ngày.']}}
+{'<span class="hl">thuc_hien</span>': {'ke_hoach': [], 'da_lam': ['Soạn câu trả lời cho khách → Dạ đơn DH002 vẫn trong hạn đổi trả 7 ngày, bạn gửi ảnh lỗi giúp mình nhé.']}}</pre></div>
+    <p>Nhìn output là thấy kế hoạch ngắn dần sau mỗi vòng, nhật ký <code>da_lam</code> dài dần. Trong app thật, <code>thuc_hien</code> sẽ là ReAct agent có tool tra cứu (bài 7) thay vì gọi LLM trơn.</p>
+    <p><strong>Dùng khi</strong>: việc nhiều bước, cần thấy/duyệt kế hoạch, hoặc muốn tách model đắt (lập kế hoạch) và model rẻ (làm từng bước). <strong>Không dùng khi</strong>: việc ngắn 1–2 bước — ReAct đủ và nhanh hơn. Biến thể hay gặp: thêm bước <em>re-plan</em> để sửa kế hoạch khi một bước thất bại.</p>
+
+    <h2>Reflection: viết – chấm – sửa</h2>
+    <p>Người viết giỏi cũng tự đọc lại và sửa. <strong>Reflection</strong> (trong tài liệu của Anthropic gọi là <strong>evaluator–optimizer</strong>) cho một bước viết và một bước chấm theo tiêu chí rõ ràng, lặp tới khi đạt hoặc hết số vòng cho phép.</p>
+<pre data-file="reflection.py"><code class="language-python">from typing import TypedDict
+from pydantic import BaseModel
+from langchain.chat_models import init_chat_model
+from langgraph.graph import StateGraph, START, END
+
+llm = init_chat_model("anthropic:claude-opus-5-5")
+
+class DanhGia(BaseModel):
+    dat: bool
+    gop_y: str
+
+class State(TypedDict):
+    de_bai: str
+    ban_nhap: str
+    gop_y: str
+    so_vong: int
+
+def viet(state: State):
+    prompt = f"Viết tin nhắn cho khách: {state['de_bai']}"
+    if state.get("gop_y"):
+        prompt += f"\nBản trước: {state['ban_nhap']}\nSửa theo góp ý: {state['gop_y']}"
+    return {"ban_nhap": llm.invoke(prompt).text, "so_vong": state.get("so_vong", 0) + 1}
+
+def cham(state: State):
+    dg = llm.with_structured_output(DanhGia).invoke(
+        "Chấm tin nhắn CSKH theo tiêu chí: có mã đơn, có ngày dự kiến, lịch sự, có bù đắp.\n"
+        + state["ban_nhap"])
+    return {"gop_y": "" if dg.dat else dg.gop_y}
+
+def du_tot_chua(state: State):
+    if not state["gop_y"] or state["so_vong"] >= 3:   # đạt, hoặc đã sửa 3 lần
+        return END
+    return "viet"</code></pre>
+    <p>Nối graph: <code>START → viet → cham</code>, rồi <code>add_conditional_edges("cham", du_tot_chua, ["viet", END])</code>.</p>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ python reflection.py      <span class="cm"># đề bài: xin lỗi khách vì đơn DH001 giao trễ, dự kiến 17/11</span>
+{'viet': {'ban_nhap': 'Shop xin lỗi. Đơn sẽ được xử lý.', 'so_vong': 1}}
+{'cham': {'gop_y': '<span class="err">Chưa nêu mã đơn và ngày giao dự kiến; chưa có đề nghị bù đắp.</span>'}}
+{'viet': {'ban_nhap': 'Kiệt Store thành thật xin lỗi vì giao trễ đơn DH001. Đơn đang trên đường giao, dự kiến 17/11. Shop tặng bạn mã FREESHIP cho lần mua sau ạ.', 'so_vong': 2}}
+{'cham': {'gop_y': '<span class="ok"></span>'}}            <span class="cm"># đạt → kết thúc</span></pre></div>
+    <p>Bước chấm hiệu quả nhất khi tiêu chí <strong>cụ thể, kiểm được</strong> (“có mã đơn”, “dưới 80 chữ”) thay vì mơ hồ (“viết hay hơn”). Luôn có giới hạn số vòng — nếu không, hai bên có thể “cãi nhau” mãi.</p>
+    <p><strong>Dùng khi</strong>: có tiêu chí chất lượng rõ ràng và bản đầu thường chưa đạt (soạn thư, viết code có test, dịch thuật). <strong>Không dùng khi</strong>: bản đầu đã đủ tốt — mỗi vòng là thêm hai lần gọi LLM.</p>
+
+    <h2>Gặp bài toán X thì chọn gì</h2>
+    <table>
+      <thead><tr><th>Bài toán</th><th>Pattern nên thử trước</th></tr></thead>
+      <tbody>
+        <tr><td>Các bước đã biết rõ, luôn giống nhau</td><td>Prompt chaining</td></tr>
+        <tr><td>Nhiều loại yêu cầu, mỗi loại xử lý khác</td><td>Routing</td></tr>
+        <tr><td>Nhiều việc độc lập, cần nhanh</td><td>Parallelization</td></tr>
+        <tr><td>Phải tra cứu dữ liệu, không biết trước cần gì</td><td>ReAct</td></tr>
+        <tr><td>Việc dài nhiều bước, muốn thấy/duyệt kế hoạch</td><td>Plan-and-execute</td></tr>
+        <tr><td>Có tiêu chí chất lượng rõ, bản đầu hay chưa đạt</td><td>Reflection</td></tr>
+        <tr><td>Một agent ôm quá nhiều tool, nghiệp vụ tách bạch</td><td>Supervisor (multi-agent)</td></tr>
+        <tr><td>Bước có rủi ro: tiền, xóa, gửi ra ngoài</td><td>Thêm human-in-the-loop vào bất kỳ pattern nào</td></tr>
+      </tbody>
+    </table>
+    <div class="callout warning" data-title="Sai lầm hay gặp"><ul><li><strong>Dùng agent cho việc workflow làm được.</strong> Nếu vẽ được các bước ra giấy trước, hãy dựng workflow.</li><li><strong>Lên multi-agent quá sớm.</strong> Một ReAct agent với tool tốt và docstring rõ thường đủ. Nhiều agent = nhiều lần gọi LLM, chậm và khó debug.</li><li><strong>Chọn pattern theo trend</strong> thay vì theo bài toán. Đo trước: độ chính xác, độ trễ, chi phí mỗi yêu cầu.</li></ul></div>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Graph bài 6 (phân loại bằng LLM rồi rẽ nhánh) là workflow hay agent? Vì sao?</summary><p>Workflow: LLM chỉ phân loại, còn đường đi do hàm chon_nhanh mình viết quyết định.</p></details>
+      <details><summary>ReAct là gì, và trong LangGraph nó trông như thế nào?</summary><p>Reason + Act: LLM lặp suy nghĩ → gọi tool → đọc kết quả tới khi trả lời được. Trong LangGraph là vòng agent ⇄ tools nối bằng tools_condition (bài 7), hoặc create_agent.</p></details>
+      <details><summary>Khi nào chọn plan-and-execute thay vì ReAct?</summary><p>Khi việc dài nhiều bước, cần thấy hoặc duyệt kế hoạch trước, hoặc muốn tách model lập kế hoạch và model thực thi.</p></details>
+      <details><summary>Vì sao vòng reflection phải có giới hạn số vòng?</summary><p>Bước chấm có thể không bao giờ hài lòng; không giới hạn thì lặp mãi và tốn tiền API.</p></details>
+    </div>
+  </section>
+
+  <!-- ===================== PHẦN 2 · NÂNG CAO ===================== -->
+
+  <section class="lesson" id="create-agent" data-part="2 · Nâng cao" data-title="create_agent và middleware: agent dựng sẵn" data-minutes="15" data-practice="30" data-updated="2026-11-16" data-done="false" data-summary="Viết lại trợ lý CSKH bằng create_agent, gắn bước duyệt bằng HumanInTheLoopMiddleware và hiểu middleware cắm vào đâu.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><code>create_agent</code> (gói <code>langchain</code>) dựng sẵn đúng <strong>ReAct agent</strong> của bài 7: node <code>model</code> ⇄ node <code>tools</code>. Kết quả vẫn là graph LangGraph: <code>invoke</code>, <code>stream</code>, checkpointer, <code>thread_id</code> dùng y như cũ.</li>
+        <li>Thêm hành vi bằng <strong>middleware</strong>: móc chạy trước/sau khi gọi model, hoặc bọc quanh mỗi lần gọi model/tool.</li>
+        <li><code>HumanInTheLoopMiddleware</code> thay cho việc tự gọi <code>interrupt</code> trong tool. Resume bằng <code>Command(resume={"decisions": [...]})</code>, mỗi decision là <strong>approve, edit, reject</strong> hoặc <strong>respond</strong>.</li>
+      </ul>
+    </div>
+
+    <h2>Vấn đề: lần nào cũng viết lại cùng một graph</h2>
+    <p>File <code>tro_ly_cskh.py</code> ở bài 10 phần lớn là “ống nước”: node gọi LLM, <code>ToolNode</code>, <code>tools_condition</code>, edge vòng lại. Agent nào cũng chép lại y nguyên. Rồi khi cần thêm log, prompt theo từng khách, giới hạn số lần hoàn tiền, mọi thứ lại dồn vào node <code>agent</code> cho tới khi nó thành một hàm 200 dòng toàn <code>if</code>.</p>
+    <p>Ví von: tự dựng <code>StateGraph</code> là tự lắp xe từ khung và máy; <code>create_agent</code> là <strong>xe nguyên chiếc</strong>, còn middleware là <strong>phụ kiện cắm vào các chân có sẵn</strong> (camera hành trình, khóa cần chìa) mà không phải tháo máy.</p>
+
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 262" role="img" aria-label="Graph mà create_agent dựng và các vị trí gắn middleware"><defs><marker id="lg2-1h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="lg2-1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="box" x="10" y="96" width="70" height="36" rx="18"/><text x="45" y="119" text-anchor="middle" class="m">START</text>
+<rect class="zone" x="96" y="12" width="616" height="242" rx="12"/><text x="112" y="36" class="b m">create_agent(model, tools, middleware=[...])</text>
+<rect class="ghost" x="112" y="90" width="118" height="48" rx="8"/><text x="171" y="111" text-anchor="middle" class="m">before_model</text><text x="171" y="128" text-anchor="middle" class="s">móc trước</text>
+<rect class="ghost" x="252" y="70" width="166" height="90" rx="10"/>
+<rect class="acc" x="266" y="80" width="138" height="50" rx="8"/><text x="335" y="102" text-anchor="middle" class="b m">model</text><text x="335" y="120" text-anchor="middle" class="s">gọi LLM + tools</text>
+<text x="335" y="150" text-anchor="middle" class="s">wrap_model_call</text>
+<rect class="ghost" x="440" y="90" width="118" height="48" rx="8"/><text x="499" y="111" text-anchor="middle" class="m">after_model</text><text x="499" y="128" text-anchor="middle" class="s">móc sau</text>
+<rect class="box" x="630" y="96" width="66" height="36" rx="18"/><text x="663" y="119" text-anchor="middle" class="m">END</text>
+<rect class="ghost" x="440" y="168" width="166" height="78" rx="10"/>
+<rect class="warn" x="454" y="176" width="138" height="44" rx="8"/><text x="523" y="195" text-anchor="middle" class="b m">tools</text><text x="523" y="212" text-anchor="middle" class="s">chạy hàm Python</text>
+<text x="523" y="238" text-anchor="middle" class="s">wrap_tool_call</text>
+<path class="ln" d="M80,114 H108" marker-end="url(#lg2-1h)"/>
+<path class="ln" d="M230,114 H262" marker-end="url(#lg2-1h)"/>
+<path class="ln" d="M404,108 H436" marker-end="url(#lg2-1h)"/>
+<path class="ln dash" d="M558,114 H626" marker-end="url(#lg2-1h)"/><text x="594" y="104" text-anchor="middle" class="s">xong</text>
+<path class="ln-a" d="M499,138 V164" marker-end="url(#lg2-1a)"/><text x="508" y="156" class="s a">có tool_calls</text>
+<path class="ln-a" d="M440,207 H171 V142" marker-end="url(#lg2-1a)"/><text x="300" y="200" text-anchor="middle" class="s a">kết quả tool → vòng mới</text>
+</svg><figcaption>Lõi vẫn là vòng model ⇄ tools của bài 7. Ô nét đứt là chỗ middleware cắm vào. Móc before/after_model thành node thật trong graph; móc wrap_* bọc quanh từng lần gọi.</figcaption></figure>
+
+    <h2>Làm từng bước: trợ lý bài 10 bằng create_agent</h2>
+    <p>Hai tool chép từ bài 10, chỉ khác: <code>hoan_tien</code> giờ là hàm “sạch”, không tự gọi <code>interrupt</code>. Việc duyệt giao cho middleware.</p>
+<pre data-file="agent_dung_san.py" data-add="1-3,7-10,12-22"><code class="language-python">from langchain.agents import create_agent
+from langchain.agents.middleware import HumanInTheLoopMiddleware
+from langgraph.checkpoint.memory import InMemorySaver
+
+# ... DON_HANG và @tool tra_cuu_don_hang như bài 10 ...
+
+@tool
+def hoan_tien(ma_don: str, so_tien: int, ly_do: str) -&gt; str:
+    """Hoàn tiền cho một đơn hàng. Chỉ dùng sau khi đã tra cứu đơn."""
+    return f"Đã hoàn {so_tien:,}đ cho đơn {ma_don}."   # gọi API thanh toán thật ở đây
+
+agent = create_agent(
+    model="anthropic:claude-opus-5-5",
+    tools=[tra_cuu_don_hang, hoan_tien],
+    system_prompt="Bạn là trợ lý chăm sóc khách hàng của Kiệt Store. Trả lời ngắn gọn, "
+                  "bằng tiếng Việt. Luôn tra cứu đơn trước khi xử lý hoàn tiền.",
+    middleware=[HumanInTheLoopMiddleware(interrupt_on={
+        "hoan_tien": {"allowed_decisions": ["approve", "edit", "reject"]},
+        "tra_cuu_don_hang": False,               # chỉ đọc dữ liệu, không cần duyệt
+    })],
+    checkpointer=InMemorySaver(),
+)</code></pre>
+    <ul>
+      <li><code>model</code> nhận chuỗi <code>"nhà_cung_cấp:tên_model"</code> hoặc object model đã tạo bằng <code>init_chat_model</code>. <code>create_agent</code> tự <code>bind_tools</code> và tự ghép <code>system_prompt</code> lên đầu mỗi lần gọi model (không lưu vào state).</li>
+      <li><code>interrupt_on</code>: tên tool → chính sách. <code>True</code> cho mọi kiểu quyết định, dict thì giới hạn kiểu được phép, <code>False</code> là không dừng.</li>
+      <li>Checkpointer vẫn bắt buộc: bên dưới middleware dùng đúng <code>interrupt()</code> của bài 9.</li>
+    </ul>
+    <p>Chạy với một hàm <code>in_buoc</code> in từng bước (giống hàm <code>chay</code> bài 10):</p>
+<pre data-file="agent_dung_san.py (phần chạy)" data-add="1-12,14-15,17-18,20"><code class="language-python">def in_buoc(buoc):
+    for node, cap_nhat in buoc.items():
+        if node == "__interrupt__":
+            print("[CHỜ DUYỆT]", cap_nhat[0].value["action_requests"][0]["args"])
+            continue
+        if not cap_nhat:                          # node middleware không đổi gì
+            continue
+        for m in cap_nhat.get("messages", []):
+            if m.type == "ai" and m.tool_calls:
+                print(f"[{node}] gọi tool:", [(t["name"], t["args"]) for t in m.tool_calls])
+            else:
+                print(f"[{node}] {m.type}: {m.text}")
+
+config = {"configurable": {"thread_id": "khach-02"}}
+CAU = {"messages": [{"role": "user", "content": "Đơn DH002 bị lỗi, hoàn tiền giúp mình"}]}
+print(list(agent.get_graph().nodes))
+for buoc in agent.stream(CAU, config, stream_mode="updates"):
+    in_buoc(buoc)
+snap = agent.get_state(config)
+print("next:", snap.next)</code></pre>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ python agent_dung_san.py
+['__start__', 'model', 'tools', <span class="hl">'HumanInTheLoopMiddleware.after_model'</span>, '__end__']
+[model] gọi tool: [('tra_cuu_don_hang', {'ma_don': 'DH002'})]
+[tools] tool: {"trang_thai": "đã giao", "tong_tien": 350000}
+[model] gọi tool: [('hoan_tien', {'ma_don': 'DH002', 'so_tien': 350000, 'ly_do': 'sản phẩm bị lỗi'})]
+<span class="hl">[CHỜ DUYỆT] {'ma_don': 'DH002', 'so_tien': 350000, 'ly_do': 'sản phẩm bị lỗi'}</span>
+next: ('HumanInTheLoopMiddleware.after_model',)</pre></div>
+    <p>Cách đọc:</p>
+    <ul>
+      <li>Dòng đầu: graph có node <code>model</code> và <code>tools</code> (bài 7 gọi là <code>agent</code>/<code>tools</code>), cộng một node do middleware thêm, tên theo mẫu <code>TênMiddleware.tên_móc</code>.</li>
+      <li>Lần tra cứu chạy luôn; tới <code>hoan_tien</code> thì dừng. <code>next</code> là node middleware chứ không phải <code>tools</code>: graph dừng <strong>trước khi tool chạy</strong>, còn bài 10 dừng bên trong tool.</li>
+      <li>Giá trị interrupt đầy đủ có hai khóa chuẩn: <code>action_requests</code> (tool, tham số) và <code>review_configs</code> (kiểu quyết định được phép) — màn hình duyệt đọc hai khóa này.</li>
+    </ul>
+    <p>Nhân viên trả lời. Ví dụ sửa số tiền thành 200.000đ:</p>
+<pre data-file="duyet.py" data-add="3-5"><code class="language-python">from langgraph.types import Command
+
+quyet_dinh = {"type": "edit", "edited_action": {"name": "hoan_tien",
+              "args": {"ma_don": "DH002", "so_tien": 200000, "ly_do": "hoàn một phần"}}}
+for buoc in agent.stream(Command(resume={"decisions": [quyet_dinh]}), config, stream_mode="updates"):
+    in_buoc(buoc)</code></pre>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ python duyet.py
+[HumanInTheLoopMiddleware.after_model] gọi tool: [('hoan_tien', {'ma_don': 'DH002', 'so_tien': 350000, 'ly_do': 'sản phẩm bị lỗi'})]
+[tools] tool: <span class="hl">Note: a human reviewer replaced this tool call before it ran.</span> ... Executed instead: hoan_tien with arguments {"ma_don": "DH002", "so_tien": 200000, ...}.
+
+Tool response:
+<span class="ok">Đã hoàn 200,000đ cho đơn DH002.</span>
+[model] ai: Shop đã hoàn 200.000đ cho đơn DH002 ạ.</pre></div>
+    <p>Tool chạy với 200.000đ, kết quả kèm ghi chú báo LLM rằng người duyệt đã sửa tham số, nên LLM báo khách đúng con số mới. Lịch sử vẫn giữ <code>AIMessage</code> gốc (350.000đ) — ai đề xuất gì, ai sửa thành gì đều còn dấu vết. Với <code>{"type": "approve"}</code> tool chạy tham số gốc; với <code>{"type": "reject", "message": "..."}</code> tool <strong>không chạy</strong>, LLM nhận <code>ToolMessage</code> lỗi chứa lý do và tự giải thích cho khách.</p>
+
+    <div class="callout warning" data-title="Cái bẫy: gõ sai tên tool, tiền đi không qua duyệt"><p>Mình thử <code>interrupt_on={"hoan_tien_don": True}</code> (thừa <code>_don</code>): không có lỗi nào, agent chạy và <strong>hoàn tiền luôn</strong>. Middleware chỉ so tên, không khớp thì im lặng bỏ qua. Dùng <code>hoan_tien.name</code> làm khóa thay vì gõ tay, và viết test “gọi hoan_tien phải dừng chờ duyệt” (bài Debug, test và deploy). Một lỗi khác hay dính khi quen bài 10: <code>Command(resume="dong_y")</code> ra <code>TypeError: string indices must be integers</code> — middleware cần dict có khóa <code>"decisions"</code>.</p></div>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>create_agent tạo ra graph gì? Khác graph tự dựng ở bài 7 ở đâu?</summary><p>Vòng model ⇄ tools (ReAct), cộng các node của middleware kiểu before/after_model. Cơ chế giống bài 7; khác là tự lo bind_tools, system prompt, và node LLM tên là model.</p></details>
+      <details><summary>HumanInTheLoopMiddleware dừng ở đâu so với interrupt trong tool ở bài 10?</summary><p>Ở node HumanInTheLoopMiddleware.after_model, sau khi model đề xuất tool call và trước khi tool chạy. Tool không cần biết gì về chuyện duyệt.</p></details>
+      <details><summary>Reject khác edit thế nào về việc tool có chạy hay không?</summary><p>Edit: tool chạy với tham số đã sửa. Reject: tool không chạy, LLM nhận ToolMessage lỗi kèm lý do từ chối.</p></details>
+    </div>
+
+    <h2>Hỏi AI để đi sâu hơn</h2>
+    <ul>
+      <li>“Giải thích các hook của AgentMiddleware trong LangChain 1.x (before_model, after_model, wrap_model_call, wrap_tool_call, dynamic_prompt): hook nào thành node trong graph, hook nào bọc lời gọi, thứ tự chạy khi có nhiều middleware.”</li>
+      <li>“Viết middleware cho create_agent đọc tên khách từ context_schema (runtime.context) để làm system prompt, và một wrap_tool_call ghi log thời gian chạy từng tool.”</li>
+      <li>“Dùng SummarizationMiddleware và ToolCallLimitMiddleware cho agent CSKH: cấu hình trigger/keep thế nào, chúng sửa state ra sao, và đánh đổi là gì.”</li>
+    </ul>
+  </section>
+
+  <section class="lesson" id="luu-tru-production" data-part="2 · Nâng cao" data-title="Lưu trữ cho production: Postgres và bộ nhớ dài hạn" data-minutes="15" data-practice="30" data-updated="2026-11-16" data-done="false" data-summary="PostgresSaver giữ hội thoại và chỗ chờ duyệt qua lần khởi động lại; Store nhớ thông tin khách xuyên nhiều cuộc trò chuyện.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><strong>Checkpointer</strong> nhớ <em>một cuộc trò chuyện</em> (theo <code>thread_id</code>). Production dùng <code>PostgresSaver</code>: tắt server, đổi tiến trình vẫn resume được đúng chỗ đang chờ duyệt.</li>
+        <li>Lần đầu với database mới phải gọi <code>setup()</code> để tạo bảng.</li>
+        <li><strong>Store</strong> nhớ <em>xuyên mọi thread</em>: dữ liệu key–value xếp theo <strong>namespace</strong> (vd <code>("khach", "KH042", "so_thich")</code>). Đây là <strong>bộ nhớ dài hạn</strong> (long-term memory); checkpointer là bộ nhớ ngắn hạn.</li>
+      </ul>
+    </div>
+
+    <h2>Vấn đề: hai kiểu “quên”</h2>
+    <p>Trợ lý bài 10 dùng <code>InMemorySaver</code>. Lên server thật có hai chuyện xảy ra. Một: deploy bản mới là tiến trình khởi động lại, mọi hội thoại và mọi yêu cầu hoàn tiền đang chờ duyệt <strong>biến mất</strong>; chạy 3 tiến trình sau load balancer thì request duyệt có thể rơi vào tiến trình không có state. Hai: khách dặn “giao sau 6h tối” hôm qua, hôm nay mở cuộc trò chuyện mới (thread mới) thì bot không biết gì.</p>
+    <p>Ví von: checkpointer là <strong>biên bản từng cuộc gọi</strong> của tổng đài; Store là <strong>hồ sơ khách hàng</strong> — cuộc gọi nào cũng mở ra xem được.</p>
+
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 230" role="img" aria-label="Checkpointer theo thread và Store theo namespace"><defs><marker id="lg2-2h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="lg2-2a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="zone" x="10" y="10" width="330" height="210" rx="12"/><text x="26" y="34" class="b">Checkpointer (ngắn hạn)</text><text x="26" y="52" class="s m">PostgresSaver · bảng checkpoints</text>
+<rect class="ok" x="26" y="66" width="298" height="60" rx="8"/><text x="40" y="88" class="b m">thread "t-1" · khách KH042</text><text x="40" y="108" class="s">hôm qua: "giao sau 6h tối giúp mình"</text>
+<rect class="ok" x="26" y="140" width="298" height="60" rx="8"/><text x="40" y="162" class="b m">thread "t-2" · khách KH042</text><text x="40" y="182" class="s">hôm nay: "đơn mới giao lúc nào?"</text>
+<rect class="zone" x="390" y="10" width="320" height="210" rx="12"/><text x="406" y="34" class="b">Store (dài hạn)</text><text x="406" y="52" class="s m">PostgresStore · bảng store</text>
+<rect class="acc" x="406" y="78" width="288" height="96" rx="8"/><text x="420" y="100" class="b m">("khach", "KH042", "so_thich")</text><text x="420" y="122" class="s m">gio_nhan → "sau 18h"</text><text x="420" y="142" class="s m">dia_chi → "12 Lý Tự Trọng, Q1"</text><text x="420" y="162" class="s">namespace + key → value</text>
+<path class="ln-a" d="M324,96 H402" marker-end="url(#lg2-2a)"/><text x="363" y="88" text-anchor="middle" class="s a">ghi</text>
+<path class="ln-a" d="M402,150 H324" marker-end="url(#lg2-2a)"/><text x="363" y="168" text-anchor="middle" class="s a">đọc</text>
+</svg><figcaption>Hai thread của cùng một khách không thấy tin nhắn của nhau, nhưng cùng đọc được hồ sơ trong Store.</figcaption></figure>
+
+    <h2>Làm từng bước</h2>
+    <h3>Bước 1 — Checkpointer Postgres, thử khởi động lại</h3>
+    <p>Chạy Postgres bằng Docker, cài <code>langgraph-checkpoint-postgres</code>, rồi viết script hai chế độ: <code>hoi</code> chạy tới chỗ chờ duyệt rồi thoát; <code>duyet</code> là một tiến trình hoàn toàn mới, resume.</p>
+<pre data-file="luu_tru.py" data-add="2,6,9-11,16-18"><code class="language-python">import sys
+from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.types import Command
+from tro_ly_cskh import builder        # builder của bài 10, chưa compile
+
+DB_URI = "postgresql://kiet:matkhau@localhost:5432/tro_ly"
+config = {"configurable": {"thread_id": "khach-02"}}
+
+with PostgresSaver.from_conn_string(DB_URI) as checkpointer:
+    checkpointer.setup()               # tạo bảng nếu chưa có; gọi lại nhiều lần không sao
+    graph = builder.compile(checkpointer=checkpointer)
+    if sys.argv[1] == "hoi":
+        kq = graph.invoke({"messages": [{"role": "user",
+                           "content": "Đơn DH002 bị lỗi, hoàn tiền giúp mình"}]}, config)
+        print("dừng chờ duyệt:", kq["__interrupt__"][0].value)
+    else:
+        snap = graph.get_state(config)
+        print("tiến trình mới, next =", snap.next, "| số tin nhắn:", len(snap.values["messages"]))
+        kq = graph.invoke(Command(resume="dong_y"), config)
+        print(kq["messages"][-1].text)</code></pre>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ docker run -d --name pg-tro-ly -e POSTGRES_USER=kiet -e POSTGRES_PASSWORD=matkhau \
+    -e POSTGRES_DB=tro_ly -p 5432:5432 postgres:16-alpine
+$ uv pip install langgraph-checkpoint-postgres "psycopg[binary]"
+$ python luu_tru.py hoi
+dừng chờ duyệt: {'hanh_dong': 'hoan_tien', 'ma_don': 'DH002', 'so_tien': 350000, 'ly_do': 'sản phẩm bị lỗi'}
+$ python luu_tru.py duyet
+tiến trình mới, next = <span class="hl">('tools',)</span> | số tin nhắn: <span class="hl">4</span>
+<span class="ok">Mình đã hoàn 350.000đ cho đơn DH002 ạ.</span>
+$ docker exec pg-tro-ly psql -U kiet -d tro_ly -c '\dt'
+ public | checkpoint_blobs      | table | kiet
+ public | checkpoint_migrations | table | kiet
+ public | checkpoint_writes     | table | kiet
+ public | checkpoints           | table | kiet</pre></div>
+    <ul>
+      <li>Lần <code>hoi</code> thoát hẳn, RAM mất sạch. Lần <code>duyet</code> là tiến trình khác nhưng đọc ra <code>next = ('tools',)</code> và 4 tin nhắn (câu hỏi, gọi tra cứu, kết quả, gọi <code>hoan_tien</code>) — đúng chỗ đã dừng ở bài 9.</li>
+      <li>Bốn bảng do <code>setup()</code> tạo: <code>checkpoints</code> (mỗi bước một dòng), <code>checkpoint_writes</code> (ghi dở của từng node), <code>checkpoint_blobs</code> (giá trị lớn như danh sách tin nhắn), <code>checkpoint_migrations</code> (phiên bản schema).</li>
+      <li>Server async (FastAPI) dùng <code>AsyncPostgresSaver</code> từ <code>langgraph.checkpoint.postgres.aio</code>, cách dùng như trên với <code>async with</code> và <code>await checkpointer.setup()</code> — bài sau.</li>
+    </ul>
+
+    <h3>Bước 2 — Store: ghi nhớ sở thích của khách</h3>
+    <p>Thêm một tool <code>ghi_nho</code> ghi vào Store theo mã khách, và một <code>dynamic_prompt</code> (bài create_agent) đọc Store đưa vào system prompt. Mã khách đi qua <em>context</em>, không để LLM tự điền.</p>
+<pre data-file="tri_nho.py" data-add="5,8-9,11-16,18-23,26"><code class="language-python">import uuid
+from dataclasses import dataclass
+from langchain.agents import create_agent
+from langchain.agents.middleware import dynamic_prompt, ModelRequest
+from langchain.tools import tool, ToolRuntime
+from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.store.memory import InMemoryStore
+
+@dataclass
+class NguCanh:
+    ma_khach: str
+
+@tool
+def ghi_nho(noi_dung: str, runtime: ToolRuntime[NguCanh]) -&gt; str:
+    """Ghi nhớ sở thích hoặc thông tin lâu dài của khách (giờ nhận hàng, địa chỉ...)."""
+    runtime.store.put(("khach", runtime.context.ma_khach, "so_thich"), str(uuid.uuid4()), {"noi_dung": noi_dung})
+    return "Đã ghi nhớ."
+
+@dynamic_prompt
+def prompt_co_tri_nho(request: ModelRequest) -&gt; str:
+    rt = request.runtime
+    items = rt.store.search(("khach", rt.context.ma_khach, "so_thich"))
+    nho = "\n".join(f"- {it.value['noi_dung']}" for it in items) or "(chưa có)"
+    return f"Bạn là trợ lý CSKH của Kiệt Store.\nNhững điều đã biết về khách này:\n{nho}"
+
+agent = create_agent("anthropic:claude-opus-5-5", tools=[tra_cuu_don_hang, ghi_nho],
+                     middleware=[prompt_co_tri_nho], context_schema=NguCanh,
+                     checkpointer=InMemorySaver(), store=InMemoryStore())</code></pre>
+    <p>Tham số <code>runtime: ToolRuntime</code> được LangChain tự truyền vào, LLM không thấy nó trong mô tả tool. Chạy hai thread khác nhau cho cùng khách <code>KH042</code> (mình in thêm system prompt ở mỗi lần gọi model để xem):</p>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ python tri_nho.py
+== thread t-1: "Lần sau giao sau 6h tối giúp mình nhé"
+  [system prompt] ... Những điều đã biết về khách này: | (chưa có)
+  [system prompt] ... Những điều đã biết về khách này: | - Chỉ nhận hàng sau 18h
+== thread t-2 (cuộc trò chuyện mới): "Đơn mới của mình giao lúc nào?"
+  [system prompt] ... Những điều đã biết về khách này: | <span class="hl">- Chỉ nhận hàng sau 18h</span>
+Dạ đơn sẽ giao sau 18h như bạn dặn ạ.
+&gt;&gt;&gt; store.search(("khach", "KH042"))
+[Item(namespace=['khach', 'KH042', 'so_thich'], key='df39a6a2-...', value={'noi_dung': 'Chỉ nhận hàng sau 18h'}, ...)]
+&gt;&gt;&gt; store.search(("khach", "KH999"))
+[]</pre></div>
+    <ul>
+      <li>Thread <code>t-1</code>: lần gọi model đầu chưa có gì, LLM gọi <code>ghi_nho</code>, lần gọi sau prompt đã có dòng mới.</li>
+      <li>Thread <code>t-2</code> chỉ có 2 tin nhắn (không thấy hội thoại hôm qua) nhưng prompt vẫn có “sau 18h” — lấy từ Store.</li>
+      <li><code>search</code> theo <strong>tiền tố</strong> namespace: <code>("khach", "KH042")</code> lấy được mọi thứ bên dưới. Khách khác ra rỗng — namespace là ranh giới dữ liệu giữa các khách.</li>
+      <li>Production thay <code>InMemoryStore</code> bằng <code>PostgresStore.from_conn_string(DB_URI)</code> (gói trên, gọi <code>store.setup()</code>). <code>put</code> cùng namespace + key thì ghi đè; có <code>get</code>, <code>delete</code>, <code>list_namespaces</code>.</li>
+    </ul>
+
+    <div class="callout warning" data-title="Cái bẫy: quên setup() với database mới"><p>Mình trỏ sang một database trống và quên dòng <code>checkpointer.setup()</code>: lần <code>invoke</code> đầu tiên nổ <code>psycopg.errors.UndefinedTable: relation "checkpoints" does not exist</code>. Lỗi trông như sai cấu hình kết nối nhưng thật ra chỉ thiếu bảng. Production thường gọi <code>setup()</code> một lần trong bước migrate/deploy thay vì mỗi lần app khởi động. Store cũng cần <code>store.setup()</code> riêng.</p></div>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Khách dặn địa chỉ giao hàng ở cuộc trò chuyện hôm qua. Lưu bằng checkpointer hay Store?</summary><p>Store. Checkpointer chỉ gắn với một thread; cuộc trò chuyện mới là thread mới nên không thấy. Store dùng chung cho mọi thread theo namespace.</p></details>
+      <details><summary>Vì sao sau khi khởi động lại, Command(resume="dong_y") vẫn chạy tiếp được với PostgresSaver?</summary><p>State lúc dừng (kể cả next và interrupt đang chờ) được lưu trong Postgres theo thread_id, nên tiến trình mới nạp lại được.</p></details>
+      <details><summary>Vì sao mã khách đưa qua context thay vì để LLM truyền vào tool ghi_nho?</summary><p>Để LLM không thể ghi/đọc nhầm hồ sơ khách khác. Context do code đưa vào, LLM không sửa được.</p></details>
+    </div>
+
+    <h2>Hỏi AI để đi sâu hơn</h2>
+    <ul>
+      <li>“Dùng AsyncPostgresSaver và AsyncPostgresStore với connection pool (psycopg_pool) trong FastAPI lifespan; khi nào cần pipeline=True; cấu hình autocommit thế nào.”</li>
+      <li>“Semantic search trong LangGraph Store: cấu hình index với embeddings cho PostgresStore (pgvector) để tìm ký ức theo nghĩa thay vì liệt kê hết.”</li>
+      <li>“Chiến lược dọn dữ liệu cho checkpointer Postgres: thread cũ, TTL, xóa thread theo yêu cầu khách (quyền được quên), dung lượng bảng checkpoint_blobs.”</li>
+    </ul>
+  </section>
+
+  <section class="lesson" id="streaming-api" data-part="2 · Nâng cao" data-title="Đưa agent lên web API và stream" data-minutes="15" data-practice="40" data-updated="2026-11-16" data-done="false" data-summary="Các chế độ stream, bọc trợ lý CSKH trong FastAPI, đẩy chữ chạy và yêu cầu duyệt về trình duyệt bằng Server-Sent Events.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><code>stream_mode</code> chọn <em>thứ</em> được stream: <code>"updates"</code> (node nào trả gì), <code>"values"</code> (cả state sau mỗi bước), <code>"messages"</code> (từng mẩu chữ LLM sinh ra), <code>"custom"</code> (dữ liệu tự phát trong node). Truyền list để lấy nhiều loại cùng lúc.</li>
+        <li>Trong server async dùng <code>astream</code>/<code>aget_state</code> và checkpointer async (<code>AsyncSqliteSaver</code>, <code>AsyncPostgresSaver</code>) tạo một lần trong <code>lifespan</code>.</li>
+        <li>Duyệt là <strong>một request riêng</strong>: <code>POST /duyet/{thread_id}</code> gọi <code>Command(resume=...)</code>. Kiểm tra thread có đang chờ duyệt không trước khi resume.</li>
+      </ul>
+    </div>
+
+    <h2>Vấn đề: khách nhìn màn hình trắng 10 giây</h2>
+    <p>Hàm <code>chay</code> ở bài 10 chạy trong terminal. Lên web thì một lượt trả lời có thể mất 5–10 giây (gọi LLM, tra cứu, gọi LLM lần nữa). Đợi xong mới trả về một cục JSON thì khách tưởng app treo. Ngoài ra nhân viên duyệt hoàn tiền trên một trang khác, vài phút sau — không thể giữ một hàm Python chờ <code>input()</code>.</p>
+    <p>Ví von: thay vì đợi nấu xong cả mâm mới bưng ra, nhà hàng <strong>bưng từng món</strong> (stream), và món nào cần bếp trưởng nếm thì bếp gửi phiếu lên, bếp trưởng ký lúc nào món đi tiếp lúc đó (request duyệt riêng).</p>
+
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 236" role="img" aria-label="Luồng FastAPI stream sự kiện SSE và endpoint duyệt"><defs><marker id="lg2-3h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="lg2-3a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="box" x="10" y="20" width="150" height="56" rx="8"/><text x="85" y="44" text-anchor="middle" class="b">Trình duyệt khách</text><text x="85" y="62" text-anchor="middle" class="s">đọc sự kiện SSE</text>
+<rect class="box" x="10" y="160" width="150" height="56" rx="8"/><text x="85" y="184" text-anchor="middle" class="b">Trang nhân viên</text><text x="85" y="202" text-anchor="middle" class="s">nút duyệt / từ chối</text>
+<rect class="zone" x="220" y="10" width="250" height="216" rx="12"/><text x="236" y="32" class="b">FastAPI</text>
+<rect class="acc" x="236" y="42" width="218" height="44" rx="8"/><text x="248" y="61" class="b m">POST /chat/{thread_id}</text><text x="248" y="78" class="s">astream → sự kiện SSE</text>
+<rect class="acc" x="236" y="100" width="218" height="44" rx="8"/><text x="248" y="119" class="b m">GET /threads/{thread_id}</text><text x="248" y="136" class="s">aget_state: đang chờ gì?</text>
+<rect class="warn" x="236" y="158" width="218" height="54" rx="8"/><text x="248" y="177" class="b m">POST /duyet/{thread_id}</text><text x="248" y="194" class="s">Command(resume=...)</text><text x="248" y="207" class="s">409 nếu không có gì chờ</text>
+<rect class="ok" x="530" y="40" width="180" height="70" rx="8"/><text x="620" y="64" text-anchor="middle" class="b">graph bài 10</text><text x="620" y="84" text-anchor="middle" class="s">agent ⇄ tools</text><text x="620" y="100" text-anchor="middle" class="s">interrupt ở hoan_tien</text>
+<rect class="zone" x="530" y="140" width="180" height="70" rx="8"/><text x="620" y="166" text-anchor="middle" class="b">Checkpointer</text><text x="620" y="186" text-anchor="middle" class="s m">AsyncSqlite/Postgres</text>
+<path class="ln-a" d="M232,58 H164" marker-end="url(#lg2-3a)"/><text x="198" y="52" text-anchor="middle" class="s a">chu, tool</text>
+<path class="ln-a" d="M164,186 H232" marker-end="url(#lg2-3a)"/>
+<path class="ln" d="M454,64 H526" marker-end="url(#lg2-3h)"/>
+<path class="ln" d="M620,110 V136" marker-end="url(#lg2-3h)"/>
+<path class="ln dash" d="M454,184 H526" marker-end="url(#lg2-3h)"/>
+</svg><figcaption>Mỗi lượt chat là một request stream sự kiện. Graph dừng ở hoan_tien thì request kết thúc bằng sự kiện cho_duyet; request duyệt đến sau, từ trang khác, cùng thread_id.</figcaption></figure>
+
+    <h2>Làm từng bước: server cho trợ lý CSKH</h2>
+    <h3>Bước 1 — Mở graph một lần khi app khởi động</h3>
+<pre data-file="server.py" data-add="1-2,5,10-14,16"><code class="language-python">import json
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
+from langchain_core.messages import AIMessageChunk
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from langgraph.types import Command
+from tro_ly_cskh import builder          # builder của bài 10, chưa compile
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with AsyncSqliteSaver.from_conn_string("bo_nho.db") as checkpointer:
+        app.state.graph = builder.compile(checkpointer=checkpointer)
+        yield                              # app chạy trong lúc này
+
+app = FastAPI(lifespan=lifespan)</code></pre>
+    <p>Kết nối database mở một lần lúc khởi động, đóng khi tắt. Đổi sang Postgres chỉ thay dòng 12 bằng <code>AsyncPostgresSaver.from_conn_string(DB_URI)</code> và thêm <code>await checkpointer.setup()</code> — mình đã chạy cả hai bản.</p>
+
+    <h3>Bước 2 — Biến stream của graph thành sự kiện SSE</h3>
+    <p>Server-Sent Events là định dạng chữ đơn giản: mỗi sự kiện gồm dòng <code>event: tên</code>, dòng <code>data: json</code> và một dòng trống. Ta lấy cùng lúc hai chế độ: <code>"messages"</code> cho chữ chạy và <code>"updates"</code> cho kết quả tool và interrupt.</p>
+<pre data-file="server.py (thêm tiếp)" data-add="1-18"><code class="language-python">def su_kien(loai: str, du_lieu) -&gt; str:
+    return f"event: {loai}\ndata: {json.dumps(du_lieu, ensure_ascii=False)}\n\n"
+
+async def phat_su_kien(graph, dau_vao, config):
+    dang_cho_duyet = False
+    async for kieu, du_lieu in graph.astream(dau_vao, config, stream_mode=["messages", "updates"]):
+        if kieu == "messages":
+            manh, meta = du_lieu
+            if isinstance(manh, AIMessageChunk) and manh.text and meta["langgraph_node"] == "agent":
+                yield su_kien("chu", {"text": manh.text})
+        elif "__interrupt__" in du_lieu:
+            dang_cho_duyet = True
+            yield su_kien("cho_duyet", du_lieu["__interrupt__"][0].value)
+        elif "tools" in du_lieu:
+            for m in du_lieu["tools"]["messages"]:
+                yield su_kien("tool", {"ten": m.name, "ket_qua": m.text})
+    if not dang_cho_duyet:                 # KHÔNG return giữa vòng lặp — xem cái bẫy
+        yield su_kien("xong", {})</code></pre>
+    <ul>
+      <li>Nhiều chế độ thì mỗi phần tử là cặp <code>(kieu, du_lieu)</code>. Với <code>"messages"</code>, <code>du_lieu</code> lại là cặp <code>(mẩu tin nhắn, metadata)</code>.</li>
+      <li>Phải lọc: chế độ messages trả cả <code>ToolMessage</code> nguyên khối từ node tools và các mẩu rỗng khi LLM gọi tool. Chỉ giữ <code>AIMessageChunk</code> có chữ, từ node <code>agent</code> (đọc <code>meta["langgraph_node"]</code>).</li>
+      <li>Dùng <code>manh.text</code> chứ không phải <code>manh.content</code>: với Claude, <code>content</code> có thể là list các block, <code>.text</code> luôn ra chuỗi.</li>
+    </ul>
+
+    <h3>Bước 3 — Ba endpoint</h3>
+<pre data-file="server.py (thêm tiếp)" data-add="1-26"><code class="language-python">class TinNhan(BaseModel):              # from pydantic import BaseModel
+    noi_dung: str
+
+class QuyetDinh(BaseModel):
+    quyet_dinh: str                    # "dong_y" | "tu_choi"
+
+@app.post("/chat/{thread_id}")
+async def chat(thread_id: str, tin: TinNhan):
+    config = {"configurable": {"thread_id": thread_id}}
+    dau_vao = {"messages": [{"role": "user", "content": tin.noi_dung}]}
+    return StreamingResponse(phat_su_kien(app.state.graph, dau_vao, config), media_type="text/event-stream")
+
+@app.post("/duyet/{thread_id}")
+async def duyet(thread_id: str, qd: QuyetDinh):
+    config = {"configurable": {"thread_id": thread_id}}
+    snap = await app.state.graph.aget_state(config)
+    if not snap.interrupts:
+        raise HTTPException(409, "Thread này không có yêu cầu nào đang chờ duyệt")
+    return StreamingResponse(phat_su_kien(app.state.graph, Command(resume=qd.quyet_dinh), config),
+                             media_type="text/event-stream")
+
+@app.get("/threads/{thread_id}")
+async def xem_thread(thread_id: str):
+    snap = await app.state.graph.aget_state({"configurable": {"thread_id": thread_id}})
+    return {"next": list(snap.next), "so_tin_nhan": len(snap.values.get("messages", [])),
+            "cho_duyet": [i.value for i in snap.interrupts]}</code></pre>
+    <p>Chạy server rồi dùng <code>curl -N</code> (không đệm, in sự kiện ngay khi tới):</p>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ uvicorn server:app --port 8000      <span class="cm"># ở một tab khác</span>
+$ curl -N -X POST localhost:8000/chat/khach-08 -H 'Content-Type: application/json' \
+    -d '{"noi_dung": "Đơn DH002 bị lỗi, hoàn tiền giúp mình"}'
+event: tool
+data: {"ten": "tra_cuu_don_hang", "ket_qua": "{\"trang_thai\": \"đã giao\", \"tong_tien\": 350000}"}
+
+<span class="hl">event: cho_duyet</span>
+data: {"hanh_dong": "hoan_tien", "ma_don": "DH002", "so_tien": 350000, "ly_do": "sản phẩm bị lỗi"}
+
+$ curl localhost:8000/threads/khach-08
+{"next":["tools"],"so_tin_nhan":4,"cho_duyet":[{"hanh_dong":"hoan_tien","ma_don":"DH002","so_tien":350000,...}]}
+$ curl -N -X POST localhost:8000/duyet/khach-08 -H 'Content-Type: application/json' -d '{"quyet_dinh": "dong_y"}'
+event: tool
+data: {"ten": "hoan_tien", "ket_qua": "Đã hoàn 350,000đ cho đơn DH002."}
+
+event: chu
+data: {"text": "Mình "}
+
+event: chu
+data: {"text": "đã "}
+<span class="cm">... mỗi mẩu chữ một sự kiện ...</span>
+event: chu
+data: {"text": "ạ."}
+
+<span class="ok">event: xong</span>
+data: {}
+
+$ curl -i -X POST localhost:8000/duyet/khach-08 -H 'Content-Type: application/json' -d '{"quyet_dinh": "dong_y"}'
+<span class="err">HTTP/1.1 409 Conflict</span></pre></div>
+    <p>Cách đọc:</p>
+    <ul>
+      <li>Request chat đầu <strong>không có sự kiện <code>chu</code></strong>: lượt này LLM chỉ gọi tool, chưa viết chữ nào. Nó kết thúc bằng <code>cho_duyet</code>, không có <code>xong</code> — giao diện hiện “đang chờ nhân viên duyệt”.</li>
+      <li><code>GET /threads</code> cho trang nhân viên biết thread nào đang chờ, chờ gì. Đây là cùng <code>next</code> và interrupt đã học ở bài 8–9, chỉ đổi sang JSON.</li>
+      <li>Request duyệt chạy tiếp: kết quả tool rồi chữ chạy từng mẩu, cuối cùng <code>xong</code>. Gọi duyệt lần nữa thì 409 — không còn gì chờ.</li>
+    </ul>
+
+    <div class="callout warning" data-title="Mình đã bị dính: return sớm làm mất chỗ chờ duyệt"><p>Bản đầu mình viết <code>return</code> ngay sau <code>yield su_kien("cho_duyet", ...)</code> cho gọn. Request chat vẫn hiện đúng <code>cho_duyet</code>, nhưng <code>GET /threads</code> sau đó ra <code>{"next":[],"so_tin_nhan":2,"cho_duyet":[]}</code> và nút duyệt báo 409. Thoát khỏi vòng <code>async for</code> giữa chừng là <strong>hủy</strong> lần chạy trước khi nó kịp lưu xong chỗ dừng (mình thử thêm <code>durability="sync"</code> mà vẫn mất). Mình chạy thử 3 lần với Postgres: <code>return</code> sớm thì cả 3 lần mất interrupt; để vòng lặp tự kết thúc thì cả 3 lần còn đủ 4 tin nhắn và 1 interrupt. Quy tắc: đừng <code>break</code>/<code>return</code> giữa <code>astream</code>; dùng cờ như <code>dang_cho_duyet</code>.</p></div>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Muốn hiện chữ chạy và đồng thời biết khi nào graph dừng chờ duyệt, dùng stream_mode nào?</summary><p>stream_mode=["messages", "updates"]: messages cho từng mẩu chữ, updates cho kết quả node và khóa __interrupt__.</p></details>
+      <details><summary>Vì sao /duyet phải kiểm tra snap.interrupts trước khi resume?</summary><p>Command(resume=...) trên thread không chờ gì vẫn chạy: thread đã xong thì không làm gì, thread mới tinh thì graph chạy từ START với state rỗng. Kiểm tra trước và trả 409 tránh chạy nhầm.</p></details>
+      <details><summary>Vì sao lọc meta["langgraph_node"] == "agent" ở chế độ messages?</summary><p>Chế độ messages trả tin nhắn từ mọi node, gồm cả ToolMessage của node tools. Chỉ chữ của LLM ở node agent mới là chữ chạy cho khách.</p></details>
+    </div>
+
+    <h2>Hỏi AI để đi sâu hơn</h2>
+    <ul>
+      <li>“Frontend React đọc Server-Sent Events từ endpoint POST (fetch + ReadableStream, vì EventSource chỉ hỗ trợ GET): hiển thị chữ chạy, hiện khung chờ duyệt khi có event cho_duyet.”</li>
+      <li>“Hai request cùng thread_id tới server LangGraph cùng lúc thì chuyện gì xảy ra? Cách khóa theo thread (lock, hàng đợi) trong FastAPI.”</li>
+      <li>“So sánh stream_mode values, updates, messages, custom, debug và tham số version='v2' của stream/invoke trong LangGraph 1.x; khi nào dùng subgraphs=True.”</li>
+    </ul>
+  </section>
+
+  <section class="lesson" id="song-song" data-part="2 · Nâng cao" data-title="Chạy song song: nhánh song song và Send" data-minutes="15" data-practice="30" data-updated="2026-11-16" data-done="false" data-summary="Fan-out / fan-in với nhánh cố định, map-reduce với Send, reducer bắt buộc và giới hạn số việc chạy cùng lúc.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li>Một node nối tới nhiều node → các node đó chạy <strong>cùng một bước (superstep)</strong>, song song. <code>add_edge([a, b, c], "gop")</code> đợi đủ cả ba mới chạy <code>gop</code>. Tên pattern: <strong>fan-out / fan-in</strong>.</li>
+        <li>Số nhánh phụ thuộc dữ liệu (5 đánh giá, 50 tài liệu) → hàm chọn đường trả về list <code>Send("node", du_lieu)</code>. Tên pattern: <strong>map-reduce</strong>.</li>
+        <li>Ô state mà nhiều nhánh cùng ghi <strong>bắt buộc có reducer</strong> (bài 4), không thì <code>InvalidUpdateError</code>.</li>
+      </ul>
+    </div>
+
+    <h2>Vấn đề: ba việc độc lập mà làm lần lượt</h2>
+    <p>Khách hỏi “đơn DH002 đổi trả được không?”. Shop phải hỏi ba hệ thống: <strong>kho</strong> (còn hàng đổi không), <strong>vận chuyển</strong> (giao ngày nào), <strong>thanh toán</strong> (trả bằng gì). Mỗi cái mất 0,5–1,5 giây. Nối tuần tự <code>kho → van_chuyen → thanh_toan</code> thì khách đợi 3 giây, dù ba việc chẳng liên quan gì nhau.</p>
+    <p>Ví von: ba nhân viên tra ba hệ thống <strong>cùng lúc</strong>, trưởng ca đợi đủ ba tờ giấy rồi mới trả lời khách. Thời gian chờ bằng việc <em>chậm nhất</em>, không phải tổng.</p>
+
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 220" role="img" aria-label="Fan-out fan-in cố định và map-reduce bằng Send"><defs><marker id="lg2-4h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="lg2-4a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="zone" x="8" y="8" width="346" height="204" rx="12"/><text x="22" y="30" class="b">Nhánh cố định (fan-out / fan-in)</text>
+<rect class="box" x="22" y="96" width="66" height="34" rx="17"/><text x="55" y="118" text-anchor="middle" class="m">START</text>
+<rect class="acc" x="128" y="44" width="104" height="34" rx="8"/><text x="180" y="66" text-anchor="middle" class="m">kho</text>
+<rect class="acc" x="128" y="96" width="104" height="34" rx="8"/><text x="180" y="118" text-anchor="middle" class="m">van_chuyen</text>
+<rect class="acc" x="128" y="148" width="104" height="34" rx="8"/><text x="180" y="170" text-anchor="middle" class="m">thanh_toan</text>
+<rect class="ok" x="266" y="96" width="76" height="34" rx="8"/><text x="304" y="118" text-anchor="middle" class="m">tong_hop</text>
+<path class="ln" d="M88,113 L124,61" marker-end="url(#lg2-4h)"/><path class="ln" d="M88,113 H124" marker-end="url(#lg2-4h)"/><path class="ln" d="M88,113 L124,165" marker-end="url(#lg2-4h)"/>
+<path class="ln" d="M232,61 L262,108" marker-end="url(#lg2-4h)"/><path class="ln" d="M232,113 H262" marker-end="url(#lg2-4h)"/><path class="ln" d="M232,165 L262,118" marker-end="url(#lg2-4h)"/>
+<text x="22" y="204" class="s">3 nhánh biết trước lúc viết code</text>
+<rect class="zone" x="366" y="8" width="346" height="204" rx="12"/><text x="380" y="30" class="b">Send (map-reduce)</text>
+<rect class="warn" x="380" y="92" width="96" height="42" rx="8"/><text x="428" y="111" text-anchor="middle" class="m">chia_viec</text><text x="428" y="127" text-anchor="middle" class="s">trả list Send</text>
+<rect class="acc" x="516" y="44" width="104" height="30" rx="8"/><text x="568" y="64" text-anchor="middle" class="s m">tom_tat_mot #1</text>
+<rect class="acc" x="516" y="82" width="104" height="30" rx="8"/><text x="568" y="102" text-anchor="middle" class="s m">tom_tat_mot #2</text>
+<rect class="ghost" x="516" y="120" width="104" height="30" rx="8"/><text x="568" y="140" text-anchor="middle" class="s">… N lần</text>
+<rect class="ok" x="644" y="92" width="58" height="42" rx="8"/><text x="673" y="117" text-anchor="middle" class="m">gop</text>
+<path class="ln-a" d="M476,113 L512,59" marker-end="url(#lg2-4a)"/><path class="ln-a" d="M476,113 L512,97" marker-end="url(#lg2-4a)"/><path class="ln-a dash" d="M476,113 L512,135" marker-end="url(#lg2-4a)"/>
+<path class="ln" d="M620,59 L640,104" marker-end="url(#lg2-4h)"/><path class="ln" d="M620,97 L640,110" marker-end="url(#lg2-4h)"/><path class="ln dash" d="M620,135 L640,122" marker-end="url(#lg2-4h)"/>
+<text x="380" y="204" class="s">N nhánh = N phần tử, mỗi nhánh state riêng</text>
+</svg><figcaption>Trái: ba node cố định cùng chạy rồi gộp. Phải: cùng một node chạy N lần, mỗi lần nhận dữ liệu riêng qua Send.</figcaption></figure>
+
+    <h2>Làm từng bước</h2>
+    <h3>Bước 1 — Ba nhánh cố định</h3>
+<pre data-file="kiem_tra_doi_tra.py" data-add="7,23-25"><code class="language-python">import time, operator
+from typing import TypedDict, Annotated
+from langgraph.graph import StateGraph, START, END
+
+class State(TypedDict):
+    ma_don: str
+    ghi_chu: Annotated[list[str], operator.add]    # nhiều nhánh cùng ghi → cần reducer
+    tra_loi: str
+
+def kho(state: State):
+    time.sleep(1.0); return {"ghi_chu": ["kho: còn hàng để đổi"]}
+def van_chuyen(state: State):
+    time.sleep(1.5); return {"ghi_chu": ["vận chuyển: giao ngày 12/11"]}
+def thanh_toan(state: State):
+    time.sleep(0.5); return {"ghi_chu": ["thanh toán: đã trả 350.000đ qua thẻ"]}
+def tong_hop(state: State):
+    return {"tra_loi": " | ".join(state["ghi_chu"])}
+
+builder = StateGraph(State)
+for ten, ham in [("kho", kho), ("van_chuyen", van_chuyen),
+                 ("thanh_toan", thanh_toan), ("tong_hop", tong_hop)]:
+    builder.add_node(ten, ham)
+for ten in ["kho", "van_chuyen", "thanh_toan"]:
+    builder.add_edge(START, ten)                                     # fan-out
+builder.add_edge(["kho", "van_chuyen", "thanh_toan"], "tong_hop")   # fan-in: đợi đủ 3
+builder.add_edge("tong_hop", END)
+graph = builder.compile()</code></pre>
+    <p>Mình thêm dòng in thời gian <code>[0.0s] kho: bắt đầu</code>… vào mỗi node rồi chạy <code>graph.stream(..., stream_mode="updates")</code>:</p>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ python kiem_tra_doi_tra.py
+[ 0.0s] kho: bắt đầu
+[ 0.0s] thanh_toan: bắt đầu
+[ 0.0s] van_chuyen: bắt đầu
+[ 0.5s] thanh_toan: xong
+{'thanh_toan': {'ghi_chu': ['thanh toán: đã trả 350.000đ qua thẻ']}}
+[ 1.0s] kho: xong
+{'kho': {'ghi_chu': ['kho: còn hàng để đổi']}}
+[ 1.5s] van_chuyen: xong
+{'van_chuyen': {'ghi_chu': ['vận chuyển: giao ngày 12/11']}}
+[ 1.5s] tong_hop: nhận 3 ghi chú
+{'tong_hop': {'tra_loi': 'kho: còn hàng để đổi | thanh toán: đã trả 350.000đ qua thẻ | vận chuyển: giao ngày 12/11'}}</pre></div>
+    <ul>
+      <li>Ba node cùng bắt đầu ở 0.0s; <code>tong_hop</code> chạy ở <strong>1.5s</strong> (việc chậm nhất), không phải 3s.</li>
+      <li>Chế độ <code>updates</code> báo từng nhánh xong theo thứ tự xong thật. Nhưng thứ tự trong <code>ghi_chu</code> lúc gộp lại khác (kho, thanh toán, vận chuyển) — mình đổi thời gian ngủ thì thứ tự gộp vẫn y nguyên, nghĩa là LangGraph gộp theo thứ tự cố định riêng của nó. Đừng viết code dựa vào thứ tự; cần thì ghi kèm tên nguồn như ở đây.</li>
+    </ul>
+
+    <h3>Bước 2 — Send: số nhánh theo dữ liệu</h3>
+    <p>Shop muốn tóm tắt các đánh giá sản phẩm, số lượng mỗi ngày một khác. Không thể vẽ sẵn N node — dùng <code>Send</code>:</p>
+<pre data-file="tom_tat_danh_gia.py" data-add="3-4,7,14-16,18-20,22-24"><code class="language-python">import operator
+from typing import TypedDict, Annotated
+from langchain.chat_models import init_chat_model
+from langgraph.types import Send
+from langgraph.graph import StateGraph, START, END
+
+llm = init_chat_model("anthropic:claude-haiku-5-5")     # việc nhỏ, model rẻ
+
+class State(TypedDict):
+    danh_gia: list[str]
+    y_chinh: Annotated[list[str], operator.add]
+    bao_cao: str
+
+class MotDanhGia(TypedDict):          # state riêng của MỖI nhánh
+    stt: int
+    noi_dung: str
+
+def chia_viec(state: State):
+    return [Send("tom_tat_mot", {"stt": i, "noi_dung": dg})
+            for i, dg in enumerate(state["danh_gia"], 1)]
+
+def tom_tat_mot(viec: MotDanhGia):
+    y = llm.invoke(f"Tóm tắt trong 5 chữ: {viec['noi_dung']}").text
+    return {"y_chinh": [f"#{viec['stt']}: {y}"]}
+
+def gop(state: State):
+    return {"bao_cao": "; ".join(state["y_chinh"])}
+
+builder = StateGraph(State)
+builder.add_node("tom_tat_mot", tom_tat_mot)
+builder.add_node("gop", gop)
+builder.add_conditional_edges(START, chia_viec, ["tom_tat_mot"])
+builder.add_edge("tom_tat_mot", "gop")
+builder.add_edge("gop", END)
+graph = builder.compile()</code></pre>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ python tom_tat_danh_gia.py      <span class="cm"># 5 đánh giá, mỗi lần tóm tắt ~0.5s</span>
+[0.0s] tóm tắt đánh giá #1
+[0.0s] tóm tắt đánh giá #2
+[0.0s] tóm tắt đánh giá #3
+[0.0s] tóm tắt đánh giá #4
+[0.0s] tóm tắt đánh giá #5
+[0.5s] gộp 5 ý
+#1: giao nhanh; #2: áo bị lỗi đường may; #3: màu đẹp; #4: giao trễ 3 ngày; #5: giá tốt
+$ python tom_tat_danh_gia.py      <span class="cm"># chạy với config {"max_concurrency": 2}</span>
+[0.0s] tóm tắt đánh giá #1
+[0.0s] tóm tắt đánh giá #2
+[0.5s] tóm tắt đánh giá #3
+[0.5s] tóm tắt đánh giá #4
+[1.0s] tóm tắt đánh giá #5
+[1.5s] gộp 5 ý</pre></div>
+    <ul>
+      <li>Mỗi <code>Send</code> là một lần chạy <code>tom_tat_mot</code> với dữ liệu riêng (<code>MotDanhGia</code>), không phải cả state. Cả năm chạy cùng bước, <code>gop</code> chạy khi xong hết.</li>
+      <li><code>graph.invoke(dau_vao, {"max_concurrency": 2})</code> giới hạn 2 việc cùng lúc — nhìn mốc thời gian 0.0 / 0.5 / 1.0. Gọi API LLM song song 50 lần dễ dính rate limit (lỗi 429), nên đặt giới hạn này.</li>
+    </ul>
+
+    <div class="callout warning" data-title="Cái bẫy: quên reducer"><p>Bỏ <code>Annotated[..., operator.add]</code> ở <code>ghi_chu</code> (để <code>list[str]</code> trơn), chạy bước 1 ra ngay:</p><p><code>InvalidUpdateError: At key 'ghi_chu': Can receive only one value per step. Use an Annotated key to handle multiple values.</code></p><p>Không có reducer thì một ô state chỉ nhận một giá trị mỗi bước; ba nhánh cùng ghi trong một bước thì LangGraph không biết giữ cái nào nên báo lỗi thay vì âm thầm ghi đè. Nhánh song song nên ghi vào ô <em>riêng</em> của mình, hoặc ô chung có reducer.</p></div>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Ba node mất 1s, 1,5s và 0,5s chạy song song. Node gộp chạy sau bao lâu?</summary><p>Khoảng 1,5s — bằng nhánh chậm nhất, vì cả ba cùng một superstep và node gộp đợi đủ.</p></details>
+      <details><summary>Khi nào dùng Send thay vì nối edge cố định?</summary><p>Khi số nhánh phụ thuộc dữ liệu lúc chạy (danh sách dài ngắn tùy lúc), hoặc mỗi nhánh cần dữ liệu đầu vào riêng.</p></details>
+      <details><summary>Vì sao nên đặt max_concurrency khi mỗi nhánh gọi LLM?</summary><p>Để không bắn quá nhiều request cùng lúc và bị rate limit (429) hoặc tốn chi phí đột biến.</p></details>
+    </div>
+
+    <h2>Hỏi AI để đi sâu hơn</h2>
+    <ul>
+      <li>“Giải thích mô hình superstep (Pregel/BSP) của LangGraph: vì sao các node song song chỉ thấy state của bước trước, và cập nhật được gộp lúc cuối bước.”</li>
+      <li>“Dùng RetryPolicy trong add_node để tự thử lại nhánh gọi LLM bị lỗi 429, kết hợp max_concurrency; khác gì với chạy lại bằng invoke(None, config).”</li>
+      <li>“Hai nhánh song song có độ dài khác nhau (nhánh A 1 node, nhánh B 2 node nối tiếp) cùng đổ về một node: khi nào node đó chạy, và tham số defer=True của add_node giúp gì.”</li>
+    </ul>
+  </section>
+
+  <section class="lesson" id="multi-agent" data-part="2 · Nâng cao" data-title="Subgraph và multi-agent" data-minutes="15" data-practice="35" data-updated="2026-11-16" data-done="false" data-summary="Dùng graph đã compile làm node (subgraph), dựng supervisor điều phối agent đơn hàng và agent kỹ thuật, và cách gọi agent như một tool.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><strong>Subgraph</strong>: một graph đã compile (kể cả <code>create_agent</code>) được thêm làm <em>node</em> của graph khác. Chung kiểu state (vd <code>MessagesState</code>) thì nó đọc/ghi thẳng state của graph cha.</li>
+        <li><strong>Supervisor</strong> (orchestrator–workers): một node điều phối chọn agent chuyên trách. Node trả về <code>Command(goto="ten_node")</code> để vừa quyết định vừa chuyển hướng.</li>
+        <li>Interrupt trong agent con vẫn chạy: graph cha dừng, resume bằng <code>Command(resume=...)</code> ở graph cha. Agent con dùng checkpointer của cha, không cần checkpointer riêng.</li>
+      </ul>
+    </div>
+
+    <h2>Vấn đề: một agent ôm mọi nghiệp vụ</h2>
+    <p>Kiệt Store mở thêm bảo hành tai nghe, loa. Trợ lý giờ cần tool đơn hàng, hoàn tiền, tra bảo hành, hướng dẫn kỹ thuật… và một system prompt dài dặn đủ quy định của mọi bộ phận. Khi số tool lên 10–15, LLM bắt đầu chọn nhầm tool; sửa prompt cho phần bảo hành lại làm hỏng phần hoàn tiền.</p>
+    <p>Ví von: tổng đài lớn không bắt một người trả lời mọi thứ. Có <strong>lễ tân</strong> nghe qua rồi chuyển máy sang <strong>phòng đơn hàng</strong> hay <strong>phòng kỹ thuật</strong>; mỗi phòng chỉ cần thuộc quy trình của mình.</p>
+
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 230" role="img" aria-label="Supervisor điều phối hai agent con là subgraph"><defs><marker id="lg2-5h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="lg2-5a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="box" x="10" y="96" width="70" height="36" rx="18"/><text x="45" y="119" text-anchor="middle" class="m">START</text>
+<rect class="warn" x="112" y="84" width="140" height="60" rx="8"/><text x="182" y="108" text-anchor="middle" class="b m">dieu_phoi</text><text x="182" y="126" text-anchor="middle" class="s">Command(goto=...)</text>
+<rect class="zone" x="300" y="8" width="300" height="100" rx="10"/><text x="314" y="28" class="b m">agent_don_hang (subgraph)</text>
+<rect class="acc" x="314" y="40" width="110" height="54" rx="8"/><text x="369" y="64" text-anchor="middle" class="m">model</text><text x="369" y="82" text-anchor="middle" class="s">prompt đơn hàng</text>
+<rect class="acc" x="470" y="40" width="116" height="54" rx="8"/><text x="528" y="64" text-anchor="middle" class="m">tools</text><text x="528" y="82" text-anchor="middle" class="s">tra cứu, hoàn tiền</text>
+<rect class="zone" x="300" y="122" width="300" height="100" rx="10"/><text x="314" y="142" class="b m">agent_ky_thuat (subgraph)</text>
+<rect class="acc" x="314" y="154" width="110" height="54" rx="8"/><text x="369" y="178" text-anchor="middle" class="m">model</text><text x="369" y="196" text-anchor="middle" class="s">prompt kỹ thuật</text>
+<rect class="acc" x="470" y="154" width="116" height="54" rx="8"/><text x="528" y="178" text-anchor="middle" class="m">tools</text><text x="528" y="196" text-anchor="middle" class="s">tra bảo hành</text>
+<rect class="box" x="640" y="96" width="70" height="36" rx="18"/><text x="675" y="119" text-anchor="middle" class="m">END</text>
+<path class="ln" d="M80,114 H108" marker-end="url(#lg2-5h)"/>
+<path class="ln-a dash" d="M252,104 L296,62" marker-end="url(#lg2-5a)"/>
+<path class="ln-a dash" d="M252,124 L296,170" marker-end="url(#lg2-5a)"/>
+<path class="ln" d="M424,67 H466" marker-end="url(#lg2-5h)"/><path class="ln" d="M424,181 H466" marker-end="url(#lg2-5h)"/>
+<path class="ln" d="M600,62 L636,106" marker-end="url(#lg2-5h)"/><path class="ln" d="M600,170 L636,124" marker-end="url(#lg2-5h)"/>
+</svg><figcaption>Mỗi agent con là một create_agent với prompt và bộ tool riêng, gắn vào graph cha như một node. Node dieu_phoi chọn đi đâu.</figcaption></figure>
+
+    <h2>Làm từng bước: lễ tân và hai phòng</h2>
+<pre data-file="da_agent.py" data-add="10-13,15-17,19-20,22-29"><code class="language-python">from typing import Literal
+from pydantic import BaseModel
+from langchain.agents import create_agent
+from langchain.chat_models import init_chat_model
+from langgraph.graph import StateGraph, START, END, MessagesState
+from langgraph.types import Command
+from langgraph.checkpoint.memory import InMemorySaver
+# tra_cuu_don_hang như bài 10; hoan_tien bản rút gọn (interrupt gửi ma_don, so_tien); tra_bao_hanh mới
+
+agent_don_hang = create_agent("anthropic:claude-opus-5-5", tools=[tra_cuu_don_hang, hoan_tien],
+    system_prompt="Bạn lo đơn hàng và hoàn tiền của Kiệt Store.", name="agent_don_hang")
+agent_ky_thuat = create_agent("anthropic:claude-opus-5-5", tools=[tra_bao_hanh],
+    system_prompt="Bạn lo bảo hành và lỗi kỹ thuật của Kiệt Store.", name="agent_ky_thuat")
+
+class ChonAgent(BaseModel):
+    agent: Literal["agent_don_hang", "agent_ky_thuat"]
+router = init_chat_model("anthropic:claude-haiku-5-5").with_structured_output(ChonAgent)
+
+def dieu_phoi(state: MessagesState) -&gt; Command[Literal["agent_don_hang", "agent_ky_thuat"]]:
+    return Command(goto=router.invoke(state["messages"]).agent)
+
+builder = StateGraph(MessagesState)
+builder.add_node("dieu_phoi", dieu_phoi)
+builder.add_node("agent_don_hang", agent_don_hang)      # graph đã compile làm node
+builder.add_node("agent_ky_thuat", agent_ky_thuat)
+builder.add_edge(START, "dieu_phoi")
+builder.add_edge("agent_don_hang", END)
+builder.add_edge("agent_ky_thuat", END)
+graph = builder.compile(checkpointer=InMemorySaver())</code></pre>
+    <ul>
+      <li>Dòng 10–13: hai agent con, mỗi cái prompt và tool riêng. <code>name</code> giúp nhận ra chúng trong output.</li>
+      <li>Dòng 15–17: lễ tân dùng structured output (bài 6) với model rẻ — việc phân loại không cần model mạnh.</li>
+      <li>Dòng 19–20: node trả <code>Command(goto=...)</code> thay vì dict. Kiểu trả về <code>Command[Literal[...]]</code> cho LangGraph biết các đích có thể để vẽ graph — không cần <code>add_conditional_edges</code>. Đây vẫn là <strong>routing</strong> của bài 6, chỉ là quyết định nằm ngay trong node.</li>
+      <li>Dòng 24–25: thêm graph đã compile như thêm một hàm. Vì cùng <code>MessagesState</code>, agent con nhận toàn bộ tin nhắn và tin nhắn của nó được nối vào state cha.</li>
+    </ul>
+    <p>Chạy hai câu hỏi, in <code>stream_mode="updates"</code>; câu kỹ thuật thêm <code>subgraphs=True</code> để nhìn vào bên trong agent con:</p>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ python da_agent.py      <span class="cm"># "Tai nghe K2 sạc không vào pin", subgraphs=True</span>
+() dieu_phoi -&gt; None
+<span class="hl">('agent_ky_thuat:016726e7-...',)</span> model -&gt; [('ai', 'tra_bao_hanh')]
+('agent_ky_thuat:016726e7-...',) tools -&gt; [('tool', 'tai nghe K2: bảo hành 12 tháng')]
+('agent_ky_thuat:016726e7-...',) model -&gt; [('ai', 'Tai nghe K2 được bảo hành 12 t')]
+() agent_ky_thuat -&gt; [('human', ...), ('ai', 'tra_bao_hanh'), ('tool', ...), ('ai', 'Tai nghe K2 được bảo hành 12 t')]
+
+$ python da_agent.py      <span class="cm"># "Đơn DH002 lỗi, hoàn tiền giúp mình"</span>
+dieu_phoi -&gt; None
+<span class="hl">__interrupt__ {'hanh_dong': 'hoan_tien', 'ma_don': 'DH002', 'so_tien': 350000}</span>
+next: ('agent_don_hang',)
+<span class="cm"># resume: graph.stream(Command(resume="dong_y"), config, ...)</span>
+agent_don_hang -&gt; [('human', ...), ('ai', 'tra_cuu_don_hang'), ('tool', ...), ('ai', 'hoan_tien'), ('tool', 'Đã hoàn 350,000đ cho đơn DH002.'), ('ai', 'Đã hoàn 350.000đ cho đơn DH002 ạ.')]
+tổng tin nhắn ở graph cha: 6</pre></div>
+    <p>Cách đọc:</p>
+    <ul>
+      <li><code>dieu_phoi -&gt; None</code>: node chỉ trả <code>Command(goto)</code>, không cập nhật state.</li>
+      <li>Với <code>subgraphs=True</code>, mỗi dòng có thêm <strong>namespace</strong>: <code>()</code> là graph cha, <code>('agent_ky_thuat:&lt;id&gt;',)</code> là bên trong agent con. Không bật thì chỉ thấy một dòng tổng <code>agent_ky_thuat</code> lúc nó chạy xong.</li>
+      <li>Câu hoàn tiền: <code>interrupt</code> trong tool <code>hoan_tien</code> nằm sâu trong agent con nhưng graph cha dừng, <code>next</code> chỉ vào node <code>agent_don_hang</code>. Resume ở graph cha, cùng <code>thread_id</code>, như bài 9.</li>
+      <li>Agent con trả lại cả tin nhắn câu hỏi, nhưng graph cha chỉ có 6 tin chứ không phải 7: reducer <code>add_messages</code> gộp theo <code>id</code> tin nhắn nên không nhân đôi.</li>
+    </ul>
+
+    <div class="callout warning" data-title="Cái bẫy: agent con thấy toàn bộ lịch sử"><p>Chung <code>MessagesState</code> nghĩa là agent kỹ thuật nhận <em>mọi</em> tin nhắn trước đó, kể cả các lần gọi tool hoàn tiền của agent đơn hàng ở lượt trước — tốn token và đôi khi làm nó bối rối. Cách khác hay dùng là <strong>gọi agent như một tool</strong>: supervisor là một <code>create_agent</code> có tool <code>hoi_ky_thuat(cau_hoi)</code>, bên trong tool gọi <code>agent_ky_thuat.invoke({"messages": [{"role": "user", "content": cau_hoi}]})</code> và trả về <code>["messages"][-1].text</code>. Mình chạy thử: supervisor tự viết lại câu hỏi đầy đủ (“Tai nghe K2 mua 10 ngày, sạc không vào pin. Có được đổi không?”), agent con chỉ thấy đúng câu đó. Đổi lại, agent con không thấy ngữ cảnh khác — supervisor phải viết câu hỏi cho đủ.</p></div>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Node trả Command(goto="agent_ky_thuat") khác gì so với conditional edge ở bài 6?</summary><p>Cùng là routing. Command gộp quyết định và chuyển hướng vào trong node (có thể kèm update state); conditional edge tách việc chọn đường ra một hàm riêng gắn trên edge.</p></details>
+      <details><summary>Tool hoan_tien gọi interrupt bên trong agent con. Resume ở đâu?</summary><p>Ở graph cha: graph.invoke(Command(resume=...), config) với cùng thread_id. Agent con dùng checkpointer của graph cha.</p></details>
+      <details><summary>Khi nào nên chia thành nhiều agent?</summary><p>Khi một agent có quá nhiều tool bắt đầu chọn nhầm, hoặc các nghiệp vụ tách bạch cần prompt riêng. Nếu một agent với tool tốt đã đủ thì đừng chia: thêm agent là thêm lần gọi LLM, chậm và khó debug hơn.</p></details>
+    </div>
+
+    <h2>Hỏi AI để đi sâu hơn</h2>
+    <ul>
+      <li>“Handoff giữa các agent trong LangGraph: tool trả về Command(goto=..., graph=Command.PARENT, update=...) để agent con chuyển quyền sang agent khác; cách giữ đúng cặp tool call / ToolMessage.”</li>
+      <li>“Subgraph có state schema khác graph cha: gọi subgraph trong một hàm node để chuyển dữ liệu vào/ra; so với thêm trực tiếp làm node.”</li>
+      <li>“So sánh supervisor dạng router (Command goto), supervisor gọi agent như tool, và mô hình swarm/handoff: ưu nhược về chi phí token, độ trễ, khả năng debug.”</li>
+    </ul>
+  </section>
+
+  <section class="lesson" id="debug-deploy" data-part="2 · Nâng cao" data-title="Debug, test và deploy" data-minutes="15" data-practice="40" data-updated="2026-11-16" data-done="false" data-summary="Viết test cho graph bằng model giả, xem lịch sử checkpoint, chạy Studio bằng langgraph dev, bật LangSmith và chọn cách deploy.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li>Test graph <strong>không cần gọi API</strong>: tạo graph bằng hàm nhận <code>llm</code> làm tham số, trong test truyền model giả trả lời theo kịch bản. Test cơ chế (có dừng chờ duyệt không, từ chối thì có hoàn tiền không), không test câu chữ của LLM.</li>
+        <li><code>graph.get_state_history(config)</code> liệt kê mọi checkpoint của một thread — đủ để biết agent đã đi qua bước nào.</li>
+        <li><code>langgraph dev</code> + file <code>langgraph.json</code> chạy graph thành API server local kèm giao diện <strong>Studio</strong>. Graph đưa cho nó <strong>không được</strong> tự gắn checkpointer.</li>
+      </ul>
+    </div>
+
+    <h2>Vấn đề: “hôm qua còn chạy đúng”</h2>
+    <p>Đồng nghiệp sửa docstring <code>hoan_tien</code>, ai đó “tạm tắt” bước duyệt để demo rồi quên bật lại. Không có test thì phải chat tay vài lượt mới phát hiện — và mỗi lượt tốn tiền API, mỗi lần LLM trả lời một khác. Khi có lỗi thật trên server, mình cũng cần thấy agent đã đi qua bước nào, gọi tool gì.</p>
+    <p>Ví von: model giả như <strong>diễn viên đóng thế đọc kịch bản</strong> — buổi tập thử sân khấu (graph, tool, interrupt) không cần ngôi sao thật; còn lịch sử checkpoint là <strong>hộp đen máy bay</strong>.</p>
+
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 200" role="img" aria-label="Các công cụ từ test tới deploy"><defs><marker id="lg2-6h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker></defs>
+<rect class="ok" x="10" y="40" width="160" height="110" rx="8"/><text x="90" y="64" text-anchor="middle" class="b">1. pytest</text><text x="90" y="86" text-anchor="middle" class="s">model giả theo kịch bản</text><text x="90" y="104" text-anchor="middle" class="s">không gọi API, &lt; 1 giây</text><text x="90" y="122" text-anchor="middle" class="s">kiểm tra cơ chế graph</text>
+<rect class="acc" x="190" y="40" width="160" height="110" rx="8"/><text x="270" y="64" text-anchor="middle" class="b">2. Lịch sử state</text><text x="270" y="86" text-anchor="middle" class="s m">get_state_history</text><text x="270" y="104" text-anchor="middle" class="s">từng bước, từng node</text><text x="270" y="122" text-anchor="middle" class="s">rẽ nhánh: update_state</text>
+<rect class="acc" x="370" y="40" width="160" height="110" rx="8"/><text x="450" y="64" text-anchor="middle" class="b">3. langgraph dev</text><text x="450" y="86" text-anchor="middle" class="s">API server local</text><text x="450" y="104" text-anchor="middle" class="s">+ giao diện Studio</text><text x="450" y="122" text-anchor="middle" class="s">LangSmith: trace</text>
+<rect class="warn" x="550" y="40" width="160" height="110" rx="8"/><text x="630" y="64" text-anchor="middle" class="b">4. Deploy</text><text x="630" y="86" text-anchor="middle" class="s">FastAPI tự host</text><text x="630" y="104" text-anchor="middle" class="s">hoặc LangSmith</text><text x="630" y="122" text-anchor="middle" class="s">Deployment</text>
+<path class="ln" d="M170,95 H186" marker-end="url(#lg2-6h)"/><path class="ln" d="M350,95 H366" marker-end="url(#lg2-6h)"/><path class="ln" d="M530,95 H546" marker-end="url(#lg2-6h)"/>
+<text x="10" y="178" class="s">Chạy từ trái sang phải: rẻ và nhanh trước, gần production sau.</text>
+</svg><figcaption>Bốn tầng kiểm tra. Bài này làm tầng 1 và 3; tầng 2 là get_state của bài 8 mở rộng ra cả lịch sử; tầng 4 đã làm ở bài web API.</figcaption></figure>
+
+    <h2>Làm từng bước</h2>
+    <h3>Bước 1 — Graph nhận llm làm tham số</h3>
+    <p>Sửa <code>tro_ly_cskh.py</code> của bài 10: thay vì tạo model ở cấp module, gói phần dựng graph vào một hàm.</p>
+<pre data-file="tro_ly_cskh.py" data-add="1-3,9"><code class="language-python">def tao_graph(llm, checkpointer=None):
+    llm_co_tool = llm.bind_tools(TOOLS)
+    def agent(state: MessagesState):
+        return {"messages": [llm_co_tool.invoke([SYSTEM] + state["messages"])]}
+    builder = StateGraph(MessagesState)
+    builder.add_node("agent", agent)
+    builder.add_node("tools", ToolNode(TOOLS))
+    # ... edge như bài 10 ...
+    return builder.compile(checkpointer=checkpointer)</code></pre>
+    <p>Code chạy thật gọi <code>tao_graph(init_chat_model("anthropic:claude-opus-5-5"), PostgresSaver(...))</code>; test truyền model giả.</p>
+
+    <h3>Bước 2 — Test bằng model giả</h3>
+<pre data-file="test_tro_ly.py" data-add="7-10,12-13,15-20,22-29"><code class="language-python">import pytest
+from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
+from langchain_core.messages import AIMessage
+from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.types import Command
+from tro_ly_cskh import tao_graph
+
+class ModelGia(FakeMessagesListChatModel):
+    """Trả lời theo kịch bản viết sẵn, không gọi API."""
+    def bind_tools(self, tools, **kw):
+        return self
+
+def goi_tool(ten, **args):
+    return AIMessage(content="", tool_calls=[{"name": ten, "args": args, "id": f"call_{ten}"}])
+
+def test_hoan_tien_phai_dung_cho_duyet():
+    llm = ModelGia(responses=[goi_tool("hoan_tien", ma_don="DH002", so_tien=350000, ly_do="lỗi")])
+    graph, config = tao_graph(llm, InMemorySaver()), {"configurable": {"thread_id": "t"}}
+    kq = graph.invoke({"messages": [("user", "hoàn tiền DH002")]}, config)
+    assert kq["__interrupt__"][0].value["so_tien"] == 350000
+
+def test_tu_choi_thi_khong_hoan():
+    llm = ModelGia(responses=[goi_tool("hoan_tien", ma_don="DH002", so_tien=350000, ly_do="lỗi"),
+                              AIMessage(content="Yêu cầu chưa được duyệt ạ.")])
+    graph, config = tao_graph(llm, InMemorySaver()), {"configurable": {"thread_id": "t"}}
+    graph.invoke({"messages": [("user", "hoàn tiền DH002")]}, config)
+    kq = graph.invoke(Command(resume="tu_choi"), config)
+    assert [m.text for m in kq["messages"] if m.type == "tool"] == [
+        "Nhân viên đã từ chối yêu cầu hoàn tiền."]</code></pre>
+    <ul>
+      <li><code>FakeMessagesListChatModel</code> (có sẵn trong <code>langchain_core</code>) trả lần lượt các tin trong <code>responses</code>. Lớp con chỉ thêm <code>bind_tools</code> trả về chính nó.</li>
+      <li><code>goi_tool</code> tạo <code>AIMessage</code> có <code>tool_calls</code> — đúng thứ LLM thật trả về ở bài 7. Kịch bản quyết định LLM “định làm gì”; test kiểm tra graph <em>xử lý</em> ý định đó đúng không.</li>
+    </ul>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ uv pip install pytest
+$ pytest -v
+test_tro_ly.py::test_hoan_tien_phai_dung_cho_duyet PASSED                [ 33%]
+test_tro_ly.py::test_tu_choi_thi_khong_hoan PASSED                       [ 66%]
+test_tro_ly.py::test_tra_cuu_khong_can_duyet PASSED                      [100%]
+<span class="ok">============================== 3 passed in 0.21s ===============================</span>
+$ pytest -q      <span class="cm"># sau khi ai đó thay interrupt(...) bằng quyet_dinh = "dong_y"</span>
+E       KeyError: '__interrupt__'
+E       AssertionError: assert ['Đã hoàn 350...o đơn DH002.'] == ['Nhân viên đ...u hoàn tiền.']
+<span class="err">FAILED test_tro_ly.py::test_hoan_tien_phai_dung_cho_duyet - KeyError: '__inte...</span>
+<span class="err">FAILED test_tro_ly.py::test_tu_choi_thi_khong_hoan - AssertionError: assert [...</span>
+2 failed, 1 passed in 0.24s</pre></div>
+    <p>Ba test (thêm một test tra cứu không cần duyệt, viết tương tự) chạy trong khoảng 0,2 giây, không tốn đồng nào. Lần hai mô phỏng chuyện “tạm tắt bước duyệt”: cả hai test về hoàn tiền đỏ ngay — <code>KeyError</code> vì không còn <code>__interrupt__</code>, và kết quả tool là “Đã hoàn” dù nhân viên từ chối. Đây đúng là test bắt được cái bẫy gõ sai tên tool ở bài create_agent.</p>
+    <h3>Bước 3 — Studio với langgraph dev</h3>
+<pre data-file="langgraph.json" data-add="1-5"><code class="language-json">{
+  "dependencies": ["."],
+  "graphs": { "tro_ly": "./graph_studio.py:graph" },
+  "env": ".env"
+}</code></pre>
+<pre data-file="graph_studio.py" data-add="1-4"><code class="language-python">from langchain.chat_models import init_chat_model
+from tro_ly_cskh import tao_graph
+
+graph = tao_graph(init_chat_model("anthropic:claude-opus-5-5"))   # KHÔNG truyền checkpointer</code></pre>
+    <div class="term" data-title="zsh — hoc-langgraph"><pre>$ uv pip install "langgraph-cli[inmem]"
+$ langgraph dev
+- API: http://127.0.0.1:2024
+- Studio UI: https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024
+- API Docs: http://127.0.0.1:2024/docs
+
+This in-memory server is designed for development and testing.
+For production use, please use <span class="hl">LangSmith Deployment</span>.
+$ curl -s -X POST localhost:2024/threads -H 'Content-Type: application/json' -d '{}'
+{"thread_id":"01a1e053-00d1-...","status":"idle",...}
+$ curl -s -X POST localhost:2024/threads/01a1e053-.../runs/wait -H 'Content-Type: application/json' \
+    -d '{"assistant_id":"tro_ly","input":{"messages":[{"role":"user","content":"Đơn DH002 bị lỗi, hoàn tiền giúp mình"}]}}'
+{"messages": [...], <span class="hl">"__interrupt__"</span>: [{"value": {"hanh_dong": "hoan_tien", "ma_don": "DH002", "so_tien": 350000, ...}, "id": "3843eca3..."}]}
+$ curl -s -X POST localhost:2024/threads/01a1e053-.../runs/wait -H 'Content-Type: application/json' \
+    -d '{"assistant_id":"tro_ly","command":{"resume":"dong_y"}}'
+{"messages": [..., {"type": "tool", "content": "Đã hoàn 350,000đ cho đơn DH002."}, {"type": "ai", "content": "Mình đã hoàn 350.000đ cho đơn DH002 ạ."}]}</pre></div>
+    <ul>
+      <li>Mở link Studio UI trên trình duyệt: thấy sơ đồ graph, gõ tin nhắn, xem state từng bước, bấm resume interrupt bằng tay — không cần viết hàm in gì.</li>
+      <li>Server này tự lo thread, checkpoint, hàng đợi. Nó dùng khái niệm <strong>assistant</strong> (<code>tro_ly</code> trong <code>langgraph.json</code>) và có API sẵn — đúng những gì mình tự viết bằng FastAPI ở bài web API. Python gọi được qua <code>langgraph_sdk.get_client(url=...)</code>; thread đang chờ duyệt có <code>status</code> là <code>interrupted</code>.</li>
+      <li><strong>LangSmith</strong>: đặt <code>LANGSMITH_TRACING=true</code> và <code>LANGSMITH_API_KEY</code> trong <code>.env</code> là mỗi lần chạy thành một trace (prompt, token, thời gian từng node), không cần sửa code.</li>
+      <li><strong>Deploy</strong>: tự host bản FastAPI + Postgres (bài web API), hoặc đưa <code>langgraph.json</code> lên nền tảng trả phí <strong>LangSmith Deployment</strong> — dòng cuối banner ở trên.</li>
+    </ul>
+
+    <div class="callout warning" data-title="Cái bẫy: graph tự gắn checkpointer"><p>Mình trỏ <code>langgraph.json</code> vào graph đã <code>compile(checkpointer=InMemorySaver())</code> của bài 10. Server khởi động nhưng graph không nạp được:</p><p><code>ValueError: Heads up! Your graph 'graph' from './graph_cp.py' includes a custom checkpointer (type &lt;class 'langgraph.checkpoint.memory.InMemorySaver'&gt;). With LangGraph API, persistence is handled automatically by the platform…</code></p><p>Server tự lo lưu trữ (muốn đổi database Postgres thì đặt biến môi trường <code>POSTGRES_URI</code>). Đây là lý do có hàm <code>tao_graph(llm, checkpointer=None)</code>: cùng một code, test truyền <code>InMemorySaver</code>, FastAPI truyền <code>AsyncPostgresSaver</code>, Studio không truyền gì.</p></div>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Test với model giả kiểm tra được gì, không kiểm tra được gì?</summary><p>Kiểm tra được cơ chế graph: tool nào chạy, có dừng chờ duyệt không, resume xử lý đúng không. Không kiểm tra được chất lượng câu trả lời hay LLM có chọn đúng tool không — phần đó cần eval với model thật (vd trên LangSmith).</p></details>
+      <details><summary>Vì sao langgraph dev báo lỗi khi graph có checkpointer riêng?</summary><p>Server LangGraph tự quản lý persistence cho mọi thread; checkpointer riêng sẽ bị bỏ qua khi deploy nên bản dev báo lỗi sớm để mình gỡ ra.</p></details>
+    </div>
+
+    <h2>Hỏi AI để đi sâu hơn</h2>
+    <ul>
+      <li>“Viết eval cho agent CSKH trên LangSmith: bộ dataset câu hỏi mẫu, evaluator kiểm tra agent có gọi tra_cuu_don_hang trước hoan_tien không, và LLM-as-judge chấm giọng văn.”</li>
+      <li>“Time travel trong LangGraph: replay từ một checkpoint_id, fork bằng update_state với as_node, và cách dùng nó để tái hiện lỗi production.”</li>
+      <li>“Dockerfile và docker-compose cho FastAPI + LangGraph + Postgres (AsyncPostgresSaver), chạy setup() lúc migrate, health check, nhiều worker uvicorn.”</li>
+    </ul>
+  </section>
+
+</main>
+</body>
+</html>

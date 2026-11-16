@@ -1,0 +1,2312 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Elasticsearch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../assets/style.css?v=20261116-6">
+<script src="../assets/common.js?v=20261116-6"></script>
+<script src="../assets/data.js?v=20261116-6"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="../assets/topic.js?v=20261116-6"></script>
+</head>
+<body data-topic="elasticsearch">
+<main id="lessons">
+  <!-- ===================== PHẦN 1 · CỐT LÕI (80/20) ===================== -->
+
+  <section class="lesson" id="elasticsearch-la-gi" data-part="1 · Cốt lõi" data-title="Elasticsearch là gì và giải quyết vấn đề gì" data-minutes="12" data-practice="0" data-updated="2026-11-16" data-done="false" data-summary="Vì sao database không làm tốt việc tìm kiếm, inverted index, và từ vựng cơ bản.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><strong>Elasticsearch</strong> (ES) là một <strong>search engine</strong>: tìm kiếm văn bản nhanh, có xếp hạng mức độ liên quan, chịu được sai chính tả, gõ không dấu.</li>
+        <li>Bí quyết nằm ở <strong>inverted index</strong> — “mục lục” ánh xạ từng từ sang các tài liệu chứa nó.</li>
+        <li>Từ vựng: <strong>document</strong> (một bản ghi JSON) nằm trong <strong>index</strong> (giống một bảng), mỗi index có <strong>mapping</strong> (giống schema).</li>
+        <li>ES thường <strong>không phải nguồn sự thật</strong>: database giữ dữ liệu gốc, ES giữ bản sao để tìm kiếm.</li>
+      </ul>
+    </div>
+
+    <h2>Bắt đầu từ thứ đã biết: tìm bằng SQL</h2>
+    <p>Kiệt Store có bảng sản phẩm trong PostgreSQL. Ô tìm kiếm đầu tiên ai cũng viết:</p>
+<pre><code class="language-sql">SELECT * FROM san_pham WHERE ten LIKE '%áo thun trắng%';</code></pre>
+    <p>Chạy được với vài trăm sản phẩm. Nhưng khách thật gõ đủ kiểu, và câu lệnh này hỏng ở mọi chỗ:</p>
+    <ul>
+      <li><strong>Gõ không dấu</strong> “ao thun trang” → không ra gì, vì trong database là “Áo thun… trắng”.</li>
+      <li><strong>Khác thứ tự</strong> “áo trắng thun” → không ra, vì <code>LIKE</code> tìm đúng chuỗi liền nhau.</li>
+      <li><strong>Gõ sai</strong> “sneker” → không ra “sneaker”.</li>
+      <li><strong>Không xếp hạng</strong>: sản phẩm khớp cả 3 từ và sản phẩm chỉ khớp 1 từ đứng lẫn lộn.</li>
+      <li><strong>Chậm</strong>: <code>LIKE '%...%'</code> không dùng được index thường, database phải đọc từng dòng. Một triệu sản phẩm là đọc một triệu dòng mỗi lần khách gõ.</li>
+      <li><strong>Bộ lọc kèm số đếm</strong> (“Áo thun (12) · Áo khoác (5)”) cần thêm nhiều câu <code>GROUP BY</code> nữa.</li>
+    </ul>
+    <p>Database được thiết kế để lưu và truy xuất <em>chính xác</em>. Tìm kiếm văn bản cần một kiểu cấu trúc dữ liệu khác hẳn — đó là việc của search engine.</p>
+
+    <h2>Inverted index: mục lục cuối sách</h2>
+    <p>Muốn tìm chữ “Kubernetes” trong một cuốn sách 500 trang, mình không đọc lại từ đầu — mình lật ra <strong>mục lục cuối sách</strong>, tra chữ đó, thấy ngay “trang 12, 48, 203”. Elasticsearch làm đúng như vậy:</p>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 226" role="img" aria-label="Inverted index ánh xạ từ sang tài liệu"><defs><marker id="eh1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="ea1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<text x="20" y="22" class="b">Tài liệu (document)</text>
+<rect class="box" x="20" y="36" width="230" height="40" rx="8"/>
+<text x="32" y="53" class="s m">SP001</text>
+<text x="32" y="68" class="">Áo thun cotton trắng</text>
+<rect class="box" x="20" y="88" width="230" height="40" rx="8"/>
+<text x="32" y="105" class="s m">SP002</text>
+<text x="32" y="120" class="">Áo thun oversize đen</text>
+<rect class="box" x="20" y="140" width="230" height="40" rx="8"/>
+<text x="32" y="157" class="s m">SP007</text>
+<text x="32" y="172" class="">Giày sneaker trắng</text>
+<path class="ln-a" d="M258,110 H316" marker-end="url(#ea1)"/>
+<text x="287" y="100" class="s a" text-anchor="middle">phân tích</text>
+<text x="330" y="22" class="b">Inverted index: từ → tài liệu chứa nó</text>
+<rect class="acc" x="330" y="34" width="110" height="20" rx="4"/>
+<text x="342" y="49" class="m">ao</text>
+<rect class="ok" x="448" y="34" width="250" height="20" rx="4"/>
+<text x="460" y="49" class="s m">SP001, SP002</text>
+<rect class="acc" x="330" y="58" width="110" height="20" rx="4"/>
+<text x="342" y="73" class="m">cotton</text>
+<rect class="ok" x="448" y="58" width="250" height="20" rx="4"/>
+<text x="460" y="73" class="s m">SP001</text>
+<rect class="acc" x="330" y="82" width="110" height="20" rx="4"/>
+<text x="342" y="97" class="m">den</text>
+<rect class="ok" x="448" y="82" width="250" height="20" rx="4"/>
+<text x="460" y="97" class="s m">SP002</text>
+<rect class="acc" x="330" y="106" width="110" height="20" rx="4"/>
+<text x="342" y="121" class="m">giay</text>
+<rect class="ok" x="448" y="106" width="250" height="20" rx="4"/>
+<text x="460" y="121" class="s m">SP007</text>
+<rect class="acc" x="330" y="130" width="110" height="20" rx="4"/>
+<text x="342" y="145" class="m">sneaker</text>
+<rect class="ok" x="448" y="130" width="250" height="20" rx="4"/>
+<text x="460" y="145" class="s m">SP007</text>
+<rect class="acc" x="330" y="154" width="110" height="20" rx="4"/>
+<text x="342" y="169" class="m">thun</text>
+<rect class="ok" x="448" y="154" width="250" height="20" rx="4"/>
+<text x="460" y="169" class="s m">SP001, SP002</text>
+<rect class="acc" x="330" y="178" width="110" height="20" rx="4"/>
+<text x="342" y="193" class="m">trang</text>
+<rect class="ok" x="448" y="178" width="250" height="20" rx="4"/>
+<text x="460" y="193" class="s m">SP001, SP007</text>
+<text x="330" y="214" class="s">Tìm “thun trang” = tra 2 dòng thun, trang → gộp, chấm điểm</text>
+</svg><figcaption>Giống mục lục cuối sách: tra từ là ra ngay danh sách tài liệu chứa nó — không phải đọc từng tài liệu.</figcaption></figure>
+    <ul>
+      <li>Lúc <strong>lưu</strong> một sản phẩm, ES tách tên thành từng từ (bỏ dấu, chữ thường…) và ghi vào mục lục: từ nào xuất hiện ở tài liệu nào.</li>
+      <li>Lúc <strong>tìm</strong>, câu tìm kiếm cũng được tách từ y như vậy, rồi tra mục lục — gần như tức thì dù có hàng triệu tài liệu.</li>
+      <li>Biết tài liệu nào khớp nhiều từ, từ hiếm hay từ phổ biến → <strong>chấm điểm liên quan</strong> và xếp hạng.</li>
+    </ul>
+    <p>Cấu trúc này gọi là <strong>inverted index</strong> (chỉ mục đảo ngược): thay vì “tài liệu → các từ trong nó”, nó lưu “từ → các tài liệu chứa nó”. Elasticsearch xây trên thư viện <strong>Apache Lucene</strong> — phần lõi làm việc này.</p>
+    <div class="callout tip" data-title="Mình hiểu sai lúc đầu"><p>Mình từng nghĩ ES “tìm nhanh vì chạy song song nhiều máy”. Chạy nhiều máy giúp chứa nhiều dữ liệu hơn, nhưng lý do chính nó nhanh là <strong>cấu trúc dữ liệu</strong>: tra mục lục thay vì đọc từng dòng. Một node trên laptop vẫn tìm trong vài mili giây.</p></div>
+
+    <h2>Từ vựng: so với database</h2>
+    <table>
+      <thead><tr><th>Elasticsearch</th><th>Gần giống trong SQL</th><th>Là gì</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Index</strong></td><td>Bảng</td><td>Một tập document cùng loại, vd <code>san_pham</code>.</td></tr>
+        <tr><td><strong>Document</strong></td><td>Một dòng</td><td>Một object JSON, có <code>_id</code>.</td></tr>
+        <tr><td><strong>Field</strong></td><td>Cột</td><td>Một thuộc tính: <code>ten</code>, <code>gia</code>…</td></tr>
+        <tr><td><strong>Mapping</strong></td><td>Schema</td><td>Kiểu của từng field và cách phân tích chữ (bài 4).</td></tr>
+        <tr><td><strong>Query DSL</strong></td><td>SQL</td><td>Ngôn ngữ truy vấn, viết bằng JSON (bài 6–7).</td></tr>
+        <tr><td><strong>Node / Cluster</strong></td><td>Server</td><td>Một tiến trình ES / một nhóm node làm việc chung.</td></tr>
+        <tr><td><strong>Shard</strong></td><td>Partition</td><td>Một mảnh của index; index lớn được chia ra nhiều shard trên nhiều node.</td></tr>
+      </tbody>
+    </table>
+    <p>Mọi thao tác đều qua <strong>REST API</strong> bằng HTTP + JSON: thêm tài liệu là <code>PUT</code>, tìm là <code>GET .../_search</code>. Vì vậy dùng được từ mọi ngôn ngữ, kể cả <code>curl</code>.</p>
+
+    <h2>Elasticsearch được dùng để làm gì</h2>
+    <table>
+      <thead><tr><th>Dùng cho</th><th>Ví dụ</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Tìm kiếm trong sản phẩm/app</strong></td><td>Ô tìm kiếm sản phẩm, bài viết, tài liệu nội bộ — khóa học này.</td></tr>
+        <tr><td><strong>Log và giám sát</strong></td><td>Gom log của hàng trăm server, tìm lỗi, vẽ biểu đồ (bộ <strong>ELK</strong>: Elasticsearch + Logstash + Kibana). Phần 2.</td></tr>
+        <tr><td><strong>Phân tích</strong></td><td>Đếm, thống kê theo nhiều chiều cực nhanh trên dữ liệu lớn (bài 8).</td></tr>
+        <tr><td><strong>Tìm theo nghĩa (vector)</strong></td><td>Semantic search, RAG cho chatbot AI. Phần 2.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>App ví dụ xuyên suốt</h2>
+    <p>Mình dựng dần <strong>ô tìm kiếm sản phẩm cho Kiệt Store</strong> (cùng shop với khóa LangGraph): 12 sản phẩm áo, quần, giày, phụ kiện. Mục tiêu cuối Phần 1: gõ “ao thun” không dấu vẫn ra đúng, xếp hạng hợp lý, lọc theo giá/danh mục/còn hàng, kèm số đếm cho bộ lọc bên trái.</p>
+
+    <h2>Học cái này mất bao lâu</h2>
+    <table>
+      <thead><tr><th>Phần</th><th>Đọc</th><th>Thực hành</th><th>Tổng</th></tr></thead>
+      <tbody>
+        <tr><td>Phần 1 · Cốt lõi (10 bài)</td><td>≈ 2,5 giờ</td><td>≈ 4,5 giờ</td><td><strong>≈ 7 giờ</strong></td></tr>
+        <tr><td>Phần 2 · Nâng cao (6 bài)</td><td>≈ 1 giờ</td><td>≈ 2,75 giờ</td><td>≈ 3,75 giờ</td></tr>
+        <tr><td>Ôn lại, tự dựng lại bài 9 không nhìn hướng dẫn</td><td></td><td>≈ 1 giờ</td><td>≈ 1 giờ</td></tr>
+        <tr><td colspan="3"><strong>Tổng</strong></td><td><strong>≈ 12 giờ</strong></td></tr>
+      </tbody>
+    </table>
+    <table>
+      <thead><tr><th>Buổi (2 giờ)</th><th>Bài</th><th>Xong buổi này thì…</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>1. Tổng quan · 2. Chạy ES · 3. Document và index</td><td>ES chạy trên máy, thêm/sửa/xóa được dữ liệu.</td></tr>
+        <tr><td>2</td><td>4. Mapping · 5. Analyzer</td><td>Hiểu text vs keyword, làm được tìm không dấu.</td></tr>
+        <tr><td>3</td><td>6. Full-text search · 7. Bool query</td><td>Viết được truy vấn tìm + lọc + sắp xếp + phân trang.</td></tr>
+        <tr><td>4</td><td>8. Aggregation · 9. Dựng app</td><td>Ô tìm kiếm có bộ lọc kèm số đếm, viết bằng Python.</td></tr>
+        <tr><td>5</td><td>10. Bản đồ khái niệm · ôn Phần 1</td><td>Nắm từ vựng ngành search, biết chọn giải pháp.</td></tr>
+        <tr><td>6</td><td>Phần 2: 11. Alias/reindex · 12. Gợi ý khi gõ, đồng nghĩa · 13. Semantic/hybrid</td><td>Đổi mapping không downtime, ô tìm kiếm có gợi ý và hiểu đồng nghĩa.</td></tr>
+        <tr><td>7</td><td>Phần 2: 14. Đồng bộ dữ liệu · 15. Log/ELK · 16. Vận hành production</td><td>Đưa ES vào hệ thống thật: đồng bộ từ database, gom log, sao lưu và bảo mật.</td></tr>
+      </tbody>
+    </table>
+    <div class="callout tip"><p>Cần Docker để chạy ES trên máy (bài 2). Không cần API key hay tài khoản cloud nào.</p></div>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Vì sao LIKE '%...%' chậm còn Elasticsearch nhanh?</summary><p>LIKE với % ở đầu không dùng được index nên phải đọc từng dòng. ES tra inverted index — mục lục từ → tài liệu — nên gần như tức thì.</p></details>
+      <details><summary>Index, document, mapping tương ứng gì trong SQL?</summary><p>Bảng, dòng, schema.</p></details>
+      <details><summary>Có nên dùng ES làm database chính không?</summary><p>Thường là không. Database giữ dữ liệu gốc (giao dịch, ràng buộc); ES giữ bản sao tối ưu cho tìm kiếm.</p></details>
+    </div>
+  </section>
+
+  <section class="lesson" id="chay-es" data-part="1 · Cốt lõi" data-title="Chạy Elasticsearch trên máy" data-minutes="12" data-practice="25" data-updated="2026-11-16" data-done="false" data-summary="Chạy ES bằng Docker, gọi API bằng curl, đọc trạng thái cluster xanh/vàng/đỏ.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li>Chạy một node ES bằng một lệnh <code>docker run</code>, gọi ở <code>http://localhost:9200</code>.</li>
+        <li>Mọi thứ là HTTP: <code>curl -X &lt;method&gt; localhost:9200/&lt;đường dẫn&gt; -d '&lt;json&gt;'</code>.</li>
+        <li>Sức khỏe cluster: <strong>green</strong> ổn · <strong>yellow</strong> thiếu bản sao · <strong>red</strong> mất dữ liệu.</li>
+        <li><code>_cat</code> API in bảng dễ đọc cho người; thêm <code>?v</code> để có tiêu đề cột.</li>
+      </ul>
+    </div>
+    <div class="callout warning"><p>Output trong các khung terminal của topic này được <strong>chạy thật</strong> trên Elasticsearch 9.5.5. Id, thời gian, điểm số trên máy bạn có thể lệch chút ít.</p></div>
+
+    <h2>Bước 1: Chạy container</h2>
+    <div class="term" data-title="zsh"><pre>$ docker run -d --name es-lab -p 9200:9200 \
+    -e discovery.type=single-node \
+    -e xpack.security.enabled=false \
+    -e ES_JAVA_OPTS="-Xms1g -Xmx1g" \
+    docker.elastic.co/elasticsearch/elasticsearch:9.5.5
+Status: Downloaded newer image for docker.elastic.co/elasticsearch/elasticsearch:9.5.5
+a719961fce38201e3a3a077dc4a482970fffe72911fab1b6fdd3dce23dcc92ab</pre></div>
+    <table>
+      <thead><tr><th>Tham số</th><th>Nghĩa</th></tr></thead>
+      <tbody>
+        <tr><td><code>-p 9200:9200</code></td><td>Cổng REST API của ES.</td></tr>
+        <tr><td><code>discovery.type=single-node</code></td><td>Chạy một mình, không đi tìm node khác để ghép cluster.</td></tr>
+        <tr><td><code>xpack.security.enabled=false</code></td><td>Tắt đăng nhập/HTTPS cho dễ học. <strong>Chỉ dùng trên máy mình</strong> — production luôn bật (Phần 2).</td></tr>
+        <tr><td><code>ES_JAVA_OPTS="-Xms1g -Xmx1g"</code></td><td>ES chạy trên Java; giới hạn bộ nhớ 1GB cho nhẹ máy.</td></tr>
+      </tbody>
+    </table>
+    <p>Chờ khoảng 20–30 giây cho ES khởi động, rồi gọi thử:</p>
+    <div class="term" data-title="zsh"><pre>$ curl localhost:9200
+{
+  "name" : "a719961fce38",
+  "cluster_name" : "docker-cluster",
+  "version" : {
+    "number" : "<span class="hl">9.5.5</span>",
+    "lucene_version" : "10.5.1",
+    ...
+  },
+  "tagline" : "You Know, for Search"
+}</pre></div>
+    <p>Thấy <code>"tagline": "You Know, for Search"</code> là ES đã sẵn sàng. Để ý <code>lucene_version</code> — thư viện lõi làm inverted index ở bài 1.</p>
+
+    <h2>Bước 2: Cluster có khỏe không?</h2>
+    <div class="term" data-title="zsh"><pre>$ curl 'localhost:9200/_cluster/health?pretty'
+{
+  "cluster_name" : "docker-cluster",
+  "status" : "<span class="ok">green</span>",
+  "number_of_nodes" : 1,
+  "active_primary_shards" : 2,
+  "active_shards" : 2,
+  "unassigned_shards" : 0,
+  ...
+}</pre></div>
+    <p><code>?pretty</code> chỉ để in JSON xuống dòng cho dễ đọc. Đọc <code>status</code>:</p>
+    <table>
+      <thead><tr><th>Status</th><th>Nghĩa</th><th>Làm gì</th></tr></thead>
+      <tbody>
+        <tr><td><span class="pill done">green</span></td><td>Mọi shard và bản sao đều đang chạy.</td><td>Không gì cả.</td></tr>
+        <tr><td><span class="pill planned">yellow</span></td><td>Dữ liệu đủ, nhưng thiếu bản sao (replica).</td><td>Trên máy 1 node thì bình thường (xem thí nghiệm dưới).</td></tr>
+        <tr><td><strong>red</strong></td><td>Có shard chính không chạy — một phần dữ liệu không truy cập được.</td><td>Xử lý ngay.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>_cat: bảng cho người đọc</h2>
+    <p>API thường trả JSON cho máy. Họ <code>_cat</code> trả bảng chữ cho người, thêm <code>?v</code> để có dòng tiêu đề:</p>
+    <div class="term" data-title="zsh"><pre>$ curl 'localhost:9200/_cat/nodes?v'
+ip            heap.percent ram.percent cpu load_1m node.role   master name
+192.168.215.4           41          24   5    1.04 cdfhilmrstw *      a719961fce38
+
+$ curl 'localhost:9200/_cat/indices?v'
+health status index uuid pri rep docs.count docs.deleted store.size</pre></div>
+    <p>Một node, chưa có index nào của mình. Ba lệnh <code>_cat</code> hay dùng nhất: <code>_cat/indices?v</code> (các index, số document, dung lượng), <code>_cat/nodes?v</code>, <code>_cat/shards?v</code>.</p>
+
+    <h2>Thí nghiệm: cluster chuyển vàng</h2>
+    <p>Tạo một index với cấu hình mặc định rồi xem:</p>
+    <div class="term" data-title="zsh"><pre>$ curl -X PUT localhost:9200/thu_vang
+$ curl 'localhost:9200/_cat/indices/thu_vang?v&amp;h=health,status,index,pri,rep'
+health status index    pri rep
+<span class="err">yellow</span> open   thu_vang   1   1
+
+$ curl 'localhost:9200/_cluster/health?filter_path=status,unassigned_shards&amp;pretty'
+{
+  "status" : "<span class="err">yellow</span>",
+  "unassigned_shards" : <span class="hl">1</span>
+}</pre></div>
+    <p>Mặc định mỗi index có <code>pri 1</code> (1 shard chính) và <code>rep 1</code> (1 bản sao). Nhưng ES không bao giờ đặt bản sao <strong>cùng node</strong> với bản chính — mất node là mất cả hai thì sao còn gọi là sao lưu. Với một node, bản sao không có chỗ ở → <code>unassigned_shards: 1</code> → vàng. Trên máy học thì đặt <code>number_of_replicas: 0</code> khi tạo index (bài 4) là xanh lại. Xóa index thử: <code>curl -X DELETE localhost:9200/thu_vang</code>.</p>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 216" role="img" aria-label="Cluster gồm node, index chia thành shard có bản sao"><defs><marker id="eh2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="ea2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="zone" x="8" y="8" width="704" height="200" rx="12"/>
+<text x="24" y="30" class="b">Cluster “docker-cluster”</text>
+<rect class="box" x="24" y="44" width="328" height="150" rx="10"/>
+<text x="38" y="66" class="b">Node 1</text>
+<text x="104" y="66" class="s">một máy / một tiến trình Elasticsearch</text>
+<rect class="acc" x="38" y="80" width="300" height="44" rx="8"/>
+<text x="50" y="98" class="s m">san_pham</text>
+<text x="50" y="114" class="b">shard 0 · primary</text>
+<rect class="ok" x="38" y="134" width="300" height="44" rx="8"/>
+<text x="50" y="152" class="s m">san_pham</text>
+<text x="50" y="168" class="b">shard 1 · replica</text>
+<rect class="box" x="368" y="44" width="328" height="150" rx="10"/>
+<text x="382" y="66" class="b">Node 2</text>
+<text x="448" y="66" class="s">một máy / một tiến trình Elasticsearch</text>
+<rect class="acc" x="382" y="80" width="300" height="44" rx="8"/>
+<text x="394" y="98" class="s m">san_pham</text>
+<text x="394" y="114" class="b">shard 1 · primary</text>
+<rect class="ok" x="382" y="134" width="300" height="44" rx="8"/>
+<text x="394" y="152" class="s m">san_pham</text>
+<text x="394" y="168" class="b">shard 0 · replica</text>
+</svg><figcaption>Index được chia thành shard; mỗi shard có bản sao (replica) nằm ở node khác. Một node chết, dữ liệu vẫn còn ở node kia.</figcaption></figure>
+
+    <h2>Kibana Dev Tools (tùy chọn)</h2>
+    <p><strong>Kibana</strong> là giao diện web đi kèm ES. Mục <em>Dev Tools</em> của nó cho gõ truy vấn kèm gợi ý, viết gọn hơn curl:</p>
+<pre><code class="language-text">GET san_pham/_search
+{ "query": { "match": { "ten": "ao thun" } } }</code></pre>
+    <p>Tài liệu chính thức và blog hay viết theo dạng này. Đọc ra curl rất dễ: dòng đầu là method + đường dẫn, phần dưới là body JSON. Khóa học dùng curl để chạy được ngay trong terminal, không cần cài thêm.</p>
+
+    <h2>Dừng và chạy lại</h2>
+    <div class="term" data-title="zsh"><pre>$ docker stop es-lab       <span class="cm"># tắt, dữ liệu vẫn còn trong container</span>
+$ docker start es-lab      <span class="cm"># bật lại</span>
+$ docker rm -f es-lab      <span class="cm"># xóa hẳn, mất dữ liệu</span></pre></div>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Cluster báo yellow trên máy một node, có đáng lo không?</summary><p>Không. Bản sao không được đặt cùng node với bản chính nên không có chỗ. Đặt number_of_replicas: 0 là xanh.</p></details>
+      <details><summary>Lệnh xem nhanh danh sách index và số document?</summary><p>curl 'localhost:9200/_cat/indices?v'</p></details>
+      <details><summary>Vì sao không được tắt security trên production?</summary><p>Ai gọi được cổng 9200 sẽ đọc, sửa, xóa được toàn bộ dữ liệu — rất nhiều vụ lộ dữ liệu đến từ ES mở không mật khẩu.</p></details>
+    </div>
+  </section>
+
+  <section class="lesson" id="document-index" data-part="1 · Cốt lõi" data-title="Document và index: thêm, đọc, sửa, xóa" data-minutes="12" data-practice="25" data-updated="2026-11-16" data-done="false" data-summary="CRUD qua REST API, đọc response, nạp nhiều tài liệu bằng _bulk, và vì sao tìm kiếm là near real-time.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li>Thêm/ghi đè: <code>PUT index/_doc/&lt;id&gt;</code> · Đọc: <code>GET index/_doc/&lt;id&gt;</code> · Sửa một phần: <code>POST index/_update/&lt;id&gt;</code> · Xóa: <code>DELETE index/_doc/&lt;id&gt;</code>.</li>
+        <li>Nạp nhiều tài liệu: <code>_bulk</code> — luôn dùng cái này khi có nhiều hơn vài tài liệu.</li>
+        <li>Tài liệu mới <strong>chưa tìm thấy ngay</strong> mà sau khoảng 1 giây (<em>near real-time</em>).</li>
+      </ul>
+    </div>
+
+    <h2>Thêm tài liệu đầu tiên</h2>
+    <div class="term" data-title="zsh"><pre>$ curl -X PUT 'localhost:9200/thu/_doc/1?pretty' -H 'Content-Type: application/json' -d '{
+    "ten": "Áo thun cotton trắng",
+    "gia": 199000,
+    "danh_muc": "Áo thun",
+    "ngay_tao": "2026-11-01"
+  }'
+{
+  "_index" : "thu",
+  "_id" : "1",
+  "_version" : 1,
+  "result" : "<span class="ok">created</span>",
+  "_shards" : { "total" : 2, "successful" : 1, "failed" : 0 },
+  ...
+}</pre></div>
+    <p>Đọc lệnh: <code>PUT</code> vào đường dẫn <code>/thu/_doc/1</code> = “ghi vào index <code>thu</code> một document có id <code>1</code>”. Header <code>Content-Type: application/json</code> là bắt buộc khi có body.</p>
+    <ul>
+      <li>Index <code>thu</code> <strong>chưa tồn tại</strong> nhưng ES tự tạo luôn. Tiện, nhưng cũng là một cái bẫy — bài 4 sẽ thấy.</li>
+      <li><code>result: created</code> — tạo mới. <code>PUT</code> lại cùng id sẽ ra <code>updated</code> và ghi đè toàn bộ.</li>
+      <li><code>_version</code> tăng mỗi lần sửa.</li>
+      <li><code>_shards: total 2, successful 1</code> — cần ghi vào 2 bản (chính + sao) nhưng chỉ ghi được 1, đúng như thí nghiệm cluster vàng ở bài 2.</li>
+    </ul>
+    <p>Không muốn tự đặt id? Dùng <code>POST thu/_doc</code> (không có id) — ES tự sinh một id ngẫu nhiên.</p>
+
+    <h2>Đọc, sửa, xóa</h2>
+    <div class="term" data-title="zsh"><pre>$ curl 'localhost:9200/thu/_doc/1?pretty'
+{
+  "_index" : "thu",
+  "_id" : "1",
+  "_version" : 1,
+  "found" : <span class="ok">true</span>,
+  "_source" : {
+    "ten" : "Áo thun cotton trắng",
+    "gia" : 199000,
+    "danh_muc" : "Áo thun",
+    "ngay_tao" : "2026-11-01"
+  }
+}</pre></div>
+    <p><code>_source</code> là nguyên văn JSON mình đã gửi. Sửa một phần (chỉ đổi giá, giữ các field khác):</p>
+    <div class="term" data-title="zsh"><pre>$ curl -X POST 'localhost:9200/thu/_update/1?pretty' -H 'Content-Type: application/json' -d '{
+    "doc": { "gia": 179000 }
+  }'
+{ "_id" : "1", "_version" : 2, "result" : "<span class="ok">updated</span>", ... }
+
+$ curl 'localhost:9200/thu/_doc/99?pretty'
+{ "_index" : "thu", "_id" : "99", "found" : <span class="err">false</span> }
+
+$ curl -X DELETE 'localhost:9200/thu/_doc/1?pretty'
+{ "_id" : "1", "_version" : 3, "result" : "<span class="err">deleted</span>", ... }
+
+$ curl -X DELETE 'localhost:9200/thu?pretty'     <span class="cm"># xóa cả index</span>
+{ "acknowledged" : true }</pre></div>
+    <table>
+      <thead><tr><th>Việc</th><th>Lệnh</th><th>Ghi chú</th></tr></thead>
+      <tbody>
+        <tr><td>Thêm / ghi đè cả tài liệu</td><td><code>PUT idx/_doc/id</code></td><td>Field không gửi sẽ mất.</td></tr>
+        <tr><td>Thêm, tự sinh id</td><td><code>POST idx/_doc</code></td><td></td></tr>
+        <tr><td>Sửa vài field</td><td><code>POST idx/_update/id</code> + <code>{"doc": {...}}</code></td><td>Giữ các field khác.</td></tr>
+        <tr><td>Đọc theo id</td><td><code>GET idx/_doc/id</code></td><td>Không cần chờ refresh.</td></tr>
+        <tr><td>Xóa</td><td><code>DELETE idx/_doc/id</code></td><td></td></tr>
+      </tbody>
+    </table>
+    <div class="callout tip" data-title="Mình ghi nhớ thế này"><p>Thực ra ES không sửa tài liệu tại chỗ. “Update” là đọc tài liệu cũ, gộp thay đổi, ghi một bản mới và đánh dấu bản cũ đã xóa. Vì vậy update liên tục một tài liệu tốn hơn mình tưởng — ES hợp với dữ liệu đọc nhiều, sửa ít.</p></div>
+
+    <h2>Nạp nhiều tài liệu: _bulk</h2>
+    <p>Gửi 12 sản phẩm bằng 12 request thì chậm; 100.000 sản phẩm thì không thể. <code>_bulk</code> gửi nhiều thao tác trong một request, định dạng <strong>NDJSON</strong> — mỗi dòng một JSON, cứ <em>một dòng lệnh, một dòng dữ liệu</em>:</p>
+<pre data-file="san_pham.ndjson"><code class="language-json">{"index": {"_id": "SP001"}}
+{"ten": "Áo thun cotton trắng basic", "mo_ta": "Áo thun 100% cotton, form regular, thấm hút mồ hôi, dễ phối đồ.", "danh_muc": "Áo thun", "thuong_hieu": "KStore", "mau": "trắng", "gia": 199000, "ton_kho": 120, "danh_gia": 4.6, "ngay_tao": "2026-10-01"}
+{"index": {"_id": "SP002"}}
+{"ten": "Áo thun oversize đen in chữ", "mo_ta": "Áo thun form rộng, in chữ phong cách đường phố, vải cotton dày.", "danh_muc": "Áo thun", "thuong_hieu": "Urban", "mau": "đen", "gia": 259000, "ton_kho": 40, "danh_gia": 4.3, "ngay_tao": "2026-10-05"}
+{"index": {"_id": "SP003"}}
+{"ten": "Áo sơ mi trắng công sở", "mo_ta": "Sơ mi trắng vải kate ít nhăn, phù hợp đi làm và đi học.", "danh_muc": "Áo sơ mi", "thuong_hieu": "KStore", "mau": "trắng", "gia": 349000, "ton_kho": 60, "danh_gia": 4.7, "ngay_tao": "2026-09-20"}
+{"index": {"_id": "SP004"}}
+{"ten": "Áo sơ mi caro flannel", "mo_ta": "Sơ mi caro vải flannel dày, mặc khoác ngoài mùa lạnh.", "danh_muc": "Áo sơ mi", "thuong_hieu": "Urban", "mau": "đỏ", "gia": 399000, "ton_kho": 0, "danh_gia": 4.1, "ngay_tao": "2026-09-28"}
+{"index": {"_id": "SP005"}}
+{"ten": "Quần jean slim fit xanh", "mo_ta": "Quần jean co giãn nhẹ, dáng ôm vừa, màu xanh wash.", "danh_muc": "Quần", "thuong_hieu": "Denimo", "mau": "xanh", "gia": 459000, "ton_kho": 35, "danh_gia": 4.5, "ngay_tao": "2026-10-10"}
+{"index": {"_id": "SP006"}}
+{"ten": "Quần short kaki be", "mo_ta": "Quần short kaki mặc mùa hè, có túi hông.", "danh_muc": "Quần", "thuong_hieu": "KStore", "mau": "be", "gia": 229000, "ton_kho": 80, "danh_gia": 4.2, "ngay_tao": "2026-10-12"}
+{"index": {"_id": "SP007"}}
+{"ten": "Giày sneaker trắng da", "mo_ta": "Sneaker da trắng đế cao su, dễ vệ sinh, hợp mọi bộ đồ.", "danh_muc": "Giày", "thuong_hieu": "Stepup", "mau": "trắng", "gia": 890000, "ton_kho": 25, "danh_gia": 4.8, "ngay_tao": "2026-10-15"}
+{"index": {"_id": "SP008"}}
+{"ten": "Giày chạy bộ siêu nhẹ", "mo_ta": "Giày chạy bộ đệm êm, thoáng khí, chỉ 220 gram.", "danh_muc": "Giày", "thuong_hieu": "Stepup", "mau": "đen", "gia": 1290000, "ton_kho": 15, "danh_gia": 4.6, "ngay_tao": "2026-10-20"}
+{"index": {"_id": "SP009"}}
+{"ten": "Áo khoác gió chống nước", "mo_ta": "Áo khoác gió mỏng nhẹ, chống nước nhẹ, gấp gọn được.", "danh_muc": "Áo khoác", "thuong_hieu": "Urban", "mau": "xanh", "gia": 549000, "ton_kho": 30, "danh_gia": 4.4, "ngay_tao": "2026-10-22"}
+{"index": {"_id": "SP010"}}
+{"ten": "Áo khoác jean wash bụi", "mo_ta": "Áo khoác jean phong cách bụi bặm, wash màu xanh nhạt.", "danh_muc": "Áo khoác", "thuong_hieu": "Denimo", "mau": "xanh", "gia": 629000, "ton_kho": 12, "danh_gia": 4.0, "ngay_tao": "2026-10-25"}
+{"index": {"_id": "SP011"}}
+{"ten": "Mũ lưỡi trai cotton", "mo_ta": "Mũ lưỡi trai vải cotton, khóa điều chỉnh phía sau.", "danh_muc": "Phụ kiện", "thuong_hieu": "KStore", "mau": "đen", "gia": 129000, "ton_kho": 200, "danh_gia": 4.3, "ngay_tao": "2026-11-01"}
+{"index": {"_id": "SP012"}}
+{"ten": "Tất cổ ngắn cotton combo 5 đôi", "mo_ta": "Combo 5 đôi tất cotton cổ ngắn, kháng khuẩn, thoáng chân.", "danh_muc": "Phụ kiện", "thuong_hieu": "KStore", "mau": "trắng", "gia": 99000, "ton_kho": 300, "danh_gia": 4.5, "ngay_tao": "2026-11-03"}
+</code></pre>
+    <p>Đây là đủ 12 sản phẩm dùng cho cả khóa học — bấm <em>Copy</em> rồi lưu thành file <code>san_pham.ndjson</code>. Lưu ý file phải <strong>kết thúc bằng một dòng trống</strong>, nếu không ES báo lỗi.</p>
+    <p>Khoan nạp — bài 4 sẽ tạo index <code>san_pham</code> với cấu hình đúng trước. Lệnh nạp sẽ trông như sau (dùng <code>--data-binary</code> để curl giữ nguyên các dòng):</p>
+    <div class="term" data-title="zsh"><pre>$ curl -X POST 'localhost:9200/san_pham/_bulk?refresh=true&amp;filter_path=errors,took' \
+    -H 'Content-Type: application/x-ndjson' --data-binary @san_pham.ndjson
+{"took":0,"errors":<span class="ok">false</span>}</pre></div>
+    <ul>
+      <li><code>errors: false</code> — tất cả thành công. Nếu <code>true</code>, xem mảng <code>items</code> để biết dòng nào lỗi: <code>_bulk</code> không dừng ở dòng lỗi đầu tiên mà làm tiếp các dòng sau.</li>
+      <li><code>filter_path=errors,took</code> — chỉ lấy vài phần của response cho gọn. Mẹo dùng suốt khóa học, vì response của ES rất dài.</li>
+    </ul>
+
+    <h2>Near real-time: vì sao vừa thêm chưa tìm thấy</h2>
+    <p>Ghi xong, document <strong>đọc theo id</strong> được ngay, nhưng <strong>tìm kiếm</strong> thì phải chờ một lần <em>refresh</em> — mặc định mỗi 1 giây ES mới đưa dữ liệu mới vào inverted index để tìm được. Gọi là <strong>near real-time</strong> (gần thời gian thực).</p>
+    <ul>
+      <li>Khi viết script/test cần tìm thấy ngay: thêm <code>?refresh=true</code> (như lệnh bulk trên) hoặc <code>?refresh=wait_for</code>.</li>
+      <li>Đừng thêm <code>refresh=true</code> vào mọi lần ghi trên production — refresh liên tục làm ES chậm hẳn.</li>
+    </ul>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>PUT idx/_doc/1 với body chỉ có {"gia": 100} vào tài liệu đang có 4 field. Kết quả?</summary><p>Tài liệu bị ghi đè chỉ còn field gia. Muốn sửa một phần phải dùng _update với {"doc": {...}}.</p></details>
+      <details><summary>Nạp 10.000 tài liệu nên dùng gì?</summary><p>_bulk, chia thành các lô vài nghìn tài liệu (hoặc vài MB) mỗi request.</p></details>
+      <details><summary>Vừa thêm tài liệu, GET theo id thấy nhưng _search không thấy. Vì sao?</summary><p>Tìm kiếm là near real-time: chờ lần refresh tiếp theo (mặc định 1 giây) hoặc ghi với ?refresh=wait_for.</p></details>
+    </div>
+  </section>
+
+  <section class="lesson" id="mapping" data-part="1 · Cốt lõi" data-title="Mapping: text hay keyword" data-minutes="15" data-practice="30" data-updated="2026-11-16" data-done="false" data-summary="ES đoán kiểu dữ liệu ra sao, khác biệt sống còn giữa text và keyword, và tạo index với mapping tự viết.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><strong>Mapping</strong> = schema: kiểu của từng field. Không khai báo thì ES tự đoán (<em>dynamic mapping</em>).</li>
+        <li>Chuỗi có hai kiểu: <strong><code>text</code></strong> — tách từ để <em>tìm kiếm</em>; <strong><code>keyword</code></strong> — giữ nguyên để <em>lọc, sắp xếp, đếm</em>.</li>
+        <li><strong>Không đổi được kiểu</strong> của field đã có. Muốn đổi phải tạo index mới và nạp lại → nên viết mapping trước khi nạp dữ liệu.</li>
+      </ul>
+    </div>
+
+    <h2>ES đã đoán gì ở bài trước?</h2>
+    <p>Bài 3 mình ghi thẳng vào index <code>thu</code> mà không khai báo gì. Xem ES tự đoán mapping ra sao (<code>GET thu/_mapping</code>, chạy lúc index còn tồn tại):</p>
+    <div class="term" data-title="zsh"><pre>$ curl 'localhost:9200/thu/_mapping?pretty'
+{
+  "thu" : {
+    "mappings" : {
+      "properties" : {
+        "danh_muc" : {
+          "type" : "<span class="hl">text</span>",
+          "fields" : { "keyword" : { "type" : "<span class="hl">keyword</span>", "ignore_above" : 256 } }
+        },
+        "gia" : { "type" : "<span class="hl">long</span>" },
+        "ngay_tao" : { "type" : "<span class="hl">date</span>" },
+        "ten" : {
+          "type" : "text",
+          "fields" : { "keyword" : { "type" : "keyword", "ignore_above" : 256 } }
+        }
+      }
+    }
+  }
+}</pre></div>
+    <ul>
+      <li><code>gia: 199000</code> → <code>long</code> (số nguyên lớn). <code>"2026-11-01"</code> → <code>date</code>, vì chuỗi trông giống ngày.</li>
+      <li>Mọi chuỗi khác → <strong>hai bản</strong>: <code>danh_muc</code> kiểu <code>text</code> và một field con <code>danh_muc.keyword</code> kiểu <code>keyword</code>. Gọi là <strong>multi-field</strong>: cùng một giá trị, lưu hai cách.</li>
+    </ul>
+    <p>ES làm vậy vì nó không biết mình định <em>tìm</em> hay <em>lọc</em> theo field đó, nên lưu cả hai cho chắc. Tiện, nhưng tốn chỗ gấp đôi, và — quan trọng hơn — dễ dùng nhầm.</p>
+
+    <h2>text và keyword khác nhau thế nào</h2>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 210" role="img" aria-label="Cùng một chuỗi lưu dạng text và keyword"><defs><marker id="eh3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="ea3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="box" x="240" y="10" width="240" height="40" rx="8"/>
+<text x="360" y="35" class="b m" text-anchor="middle">"Áo thun"</text>
+<path class="ln" d="M300,50 L170,86" marker-end="url(#eh3)"/>
+<path class="ln" d="M420,50 L550,86" marker-end="url(#eh3)"/>
+<rect class="acc" x="20" y="90" width="300" height="110" rx="8"/>
+<text x="34" y="112" class="b m">text</text>
+<text x="80" y="112" class="s">→ qua analyzer, tách từ</text>
+<rect class="box" x="34" y="124" width="70" height="28" rx="5"/>
+<text x="69" y="143" class="m" text-anchor="middle">ao</text>
+<rect class="box" x="114" y="124" width="70" height="28" rx="5"/>
+<text x="149" y="143" class="m" text-anchor="middle">thun</text>
+<text x="34" y="176" class="s">khớp: “thun”, “áo thun”, “AO THUN”…</text>
+<text x="34" y="192" class="s">dùng cho: tìm kiếm full-text</text>
+<rect class="ok" x="400" y="90" width="300" height="110" rx="8"/>
+<text x="414" y="112" class="b m">keyword</text>
+<text x="484" y="112" class="s">→ giữ nguyên cả chuỗi</text>
+<rect class="box" x="414" y="124" width="120" height="28" rx="5"/>
+<text x="474" y="143" class="m" text-anchor="middle">Áo thun</text>
+<text x="414" y="176" class="s">chỉ khớp đúng “Áo thun”</text>
+<text x="414" y="192" class="s">dùng cho: lọc, sắp xếp, đếm</text>
+</svg><figcaption>Cùng một giá trị, hai cách lưu: text để tìm theo từ, keyword để lọc/sắp xếp/đếm chính xác.</figcaption></figure>
+    <table>
+      <thead><tr><th></th><th><code>text</code></th><th><code>keyword</code></th></tr></thead>
+      <tbody>
+        <tr><td>Lưu</td><td>Tách thành từng từ (qua analyzer, bài 5)</td><td>Nguyên cả chuỗi, phân biệt hoa thường</td></tr>
+        <tr><td>Dùng với</td><td><code>match</code>, <code>multi_match</code> — tìm kiếm</td><td><code>term</code>, <code>range</code>, sort, aggregation</td></tr>
+        <tr><td>Hợp với field</td><td>Tên sản phẩm, mô tả, nội dung bài viết</td><td>Mã đơn, email, danh mục, thương hiệu, trạng thái, tag</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Thí nghiệm: term trên field text</h2>
+    <p><code>term</code> là truy vấn “khớp chính xác giá trị này”. Tạo nhanh một index để ES tự đoán mapping, rồi thử lọc danh mục “Áo thun”:</p>
+    <div class="term" data-title="zsh"><pre>$ curl -X PUT localhost:9200/san_pham_mac_dinh -H 'Content-Type: application/json' -d '{"settings": {"number_of_replicas": 0}}'
+$ curl -X POST 'localhost:9200/san_pham_mac_dinh/_doc?refresh=true' -H 'Content-Type: application/json' \
+    -d '{"ten": "Áo thun cotton trắng basic", "danh_muc": "Áo thun"}'</pre></div>
+    <div class="term" data-title="zsh"><pre>$ curl 'localhost:9200/san_pham_mac_dinh/_search?filter_path=hits.total' \
+    -H 'Content-Type: application/json' -d '{"query": {"term": {"danh_muc": "Áo thun"}}}'
+{"hits":{"total":{"value":<span class="err">0</span>,"relation":"eq"}}}
+
+$ curl 'localhost:9200/san_pham_mac_dinh/_search?filter_path=hits.total' \
+    -H 'Content-Type: application/json' -d '{"query": {"term": {"danh_muc.keyword": "Áo thun"}}}'
+{"hits":{"total":{"value":<span class="ok">1</span>,"relation":"eq"}}}</pre></div>
+    <p>Lần một ra <strong>0</strong> dù dữ liệu rõ ràng có “Áo thun”. Vì <code>danh_muc</code> là <code>text</code>: trong index chỉ có hai từ rời <code>áo</code> và <code>thun</code> — không có giá trị nào là nguyên chuỗi “Áo thun”. Lần hai dùng field con <code>.keyword</code> thì khớp.</p>
+    <div class="callout warning" data-title="Mình đã bị dính chỗ này"><p>Lỗi phổ biến nhất khi mới học ES: <strong>dùng <code>term</code> trên field <code>text</code></strong> và nhận về 0 kết quả mà không có lỗi gì. Quy tắc: <code>term</code>/<code>range</code>/sort/aggregation → field <code>keyword</code> (hoặc số, ngày); <code>match</code> → field <code>text</code>.</p></div>
+
+    <h2>Tự viết mapping cho index san_pham</h2>
+    <p>Với từng field, tự hỏi: <em>người dùng gõ chữ để tìm theo field này (→ text), hay mình lọc/sắp xếp/đếm theo nó (→ keyword/số)?</em></p>
+<pre data-file="mapping.json"><code class="language-json">{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0
+  },
+  "mappings": {
+    "properties": {
+      "ten":         { "type": "text",
+                       "fields": { "keyword": { "type": "keyword" } } },
+      "mo_ta":       { "type": "text" },
+      "danh_muc":    { "type": "keyword" },
+      "thuong_hieu": { "type": "keyword" },
+      "mau":         { "type": "keyword" },
+      "gia":         { "type": "integer" },
+      "ton_kho":     { "type": "integer" },
+      "danh_gia":    { "type": "float" },
+      "ngay_tao":    { "type": "date" }
+    }
+  }
+}</code></pre>
+    <ul>
+      <li><code>settings.number_of_replicas: 0</code> — máy một node, khỏi bị vàng (bài 2).</li>
+      <li><code>ten</code>: tìm kiếm (<code>text</code>) <em>và</em> cần sắp xếp theo tên (<code>ten.keyword</code>) → multi-field.</li>
+      <li><code>mo_ta</code>: chỉ để tìm → <code>text</code>.</li>
+      <li><code>danh_muc</code>, <code>thuong_hieu</code>, <code>mau</code>: chỉ để lọc và đếm → <code>keyword</code> thẳng, không cần bản text.</li>
+      <li>Số và ngày: kiểu riêng để lọc khoảng (<code>range</code>) và sắp xếp đúng thứ tự số.</li>
+    </ul>
+    <p>Bài 5 sẽ thêm một mục <code>analysis</code> vào <code>settings</code> để tìm được không dấu — nên <strong>chưa</strong> tạo index vội. Lệnh tạo sẽ là:</p>
+    <div class="term" data-title="zsh"><pre>$ curl -X PUT 'localhost:9200/san_pham?pretty' -H 'Content-Type: application/json' -d @mapping.json
+{
+  "acknowledged" : true,
+  "shards_acknowledged" : true,
+  "index" : "san_pham"
+}</pre></div>
+
+    <h2>Thí nghiệm: không đổi được kiểu</h2>
+    <p>Sau khi tạo index <code>san_pham</code> ở bài 5, quay lại thử đổi <code>gia</code> từ số sang keyword:</p>
+    <div class="term" data-title="zsh"><pre>$ curl -X PUT 'localhost:9200/san_pham/_mapping?pretty' -H 'Content-Type: application/json' \
+    -d '{"properties": {"gia": {"type": "keyword"}}}'
+{
+  "error" : {
+    "type" : "illegal_argument_exception",
+    "reason" : "<span class="err">mapper [gia] cannot be changed from type [integer] to [keyword]</span>"
+  },
+  "status" : 400
+}</pre></div>
+    <p>Dữ liệu đã được đưa vào inverted index theo kiểu cũ; đổi kiểu nghĩa là phải xây lại toàn bộ. Cách làm chuẩn: tạo index mới với mapping đúng, dùng <code>_reindex</code> chép dữ liệu sang, rồi chuyển <strong>alias</strong> — không downtime (Phần 2). <strong>Thêm field mới</strong> thì luôn được.</p>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Field email nên là text hay keyword?</summary><p>keyword — mình lọc chính xác theo email, không tìm từng từ trong đó.</p></details>
+      <details><summary>Truy vấn term trên field text trả về 0 kết quả. Sửa thế nào?</summary><p>Dùng field keyword (vd danh_muc.keyword) cho term, hoặc dùng match nếu thật sự muốn tìm theo từ.</p></details>
+      <details><summary>Muốn đổi kiểu một field đã có dữ liệu thì làm gì?</summary><p>Tạo index mới với mapping đúng, _reindex dữ liệu sang, đổi alias trỏ sang index mới.</p></details>
+    </div>
+  </section>
+
+  <section class="lesson" id="analyzer" data-part="1 · Cốt lõi" data-title="Analyzer: tìm được khi gõ không dấu" data-minutes="15" data-practice="25" data-updated="2026-11-16" data-done="false" data-summary="Chữ được biến thành từ khóa như thế nào, xem bằng _analyze, và tự tạo analyzer cho tiếng Việt.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><strong>Analyzer</strong> biến chuỗi thành danh sách từ (token) để đưa vào inverted index: <strong>tokenizer</strong> cắt từ + các <strong>token filter</strong> biến đổi từ.</li>
+        <li>Câu tìm kiếm đi qua <strong>cùng analyzer</strong> → hai bên khớp nhau.</li>
+        <li>Tiếng Việt: thêm filter <code>asciifolding</code> để “ao thun trang” khớp “Áo thun trắng”.</li>
+        <li>Xem analyzer làm gì bằng <code>_analyze</code> — công cụ debug số một khi tìm không ra.</li>
+      </ul>
+    </div>
+
+    <h2>Vấn đề: khách gõ không dấu</h2>
+    <p>Trên index để ES tự đoán mapping (bài 4), thử tìm như một khách lười gõ dấu:</p>
+    <div class="term" data-title="zsh"><pre>$ curl 'localhost:9200/san_pham_mac_dinh/_search?filter_path=hits.total' \
+    -H 'Content-Type: application/json' -d '{"query": {"match": {"ten": "áo trắng"}}}'
+{"hits":{"total":{"value":<span class="ok">1</span>,"relation":"eq"}}}
+
+$ curl 'localhost:9200/san_pham_mac_dinh/_search?filter_path=hits.total' \
+    -H 'Content-Type: application/json' -d '{"query": {"match": {"ten": "ao trang"}}}'
+{"hits":{"total":{"value":<span class="err">0</span>,"relation":"eq"}}}</pre></div>
+    <p>Có dấu thì ra, không dấu thì không. Ở Việt Nam, phần lớn người dùng gõ không dấu khi tìm kiếm — ô tìm kiếm như này là hỏng. Để hiểu vì sao, nhìn vào thứ đã biến chữ thành từ khóa: <strong>analyzer</strong>.</p>
+
+    <h2>Analyzer là một dây chuyền</h2>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 186" role="img" aria-label="Analyzer gồm tokenizer và các token filter"><defs><marker id="eh4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="ea4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="box" x="10" y="70" width="130" height="56" rx="8"/>
+<text x="75" y="94" class="m" text-anchor="middle">"Áo Thun</text>
+<text x="75" y="112" class="m" text-anchor="middle">cotton TRẮNG"</text>
+<rect class="acc" x="170" y="56" width="150" height="84" rx="8"/>
+<text x="245" y="80" class="b" text-anchor="middle">tokenizer</text>
+<text x="245" y="98" class="s m" text-anchor="middle">standard</text>
+<text x="245" y="118" class="s" text-anchor="middle">tách theo khoảng trắng,</text>
+<text x="245" y="132" class="s" text-anchor="middle">dấu câu</text>
+<rect class="acc" x="350" y="56" width="150" height="84" rx="8"/>
+<text x="425" y="80" class="b" text-anchor="middle">token filter</text>
+<text x="425" y="98" class="s m" text-anchor="middle">lowercase</text>
+<text x="425" y="116" class="s m" text-anchor="middle">asciifolding</text>
+<text x="425" y="132" class="s" text-anchor="middle">chữ thường, bỏ dấu</text>
+<rect class="ok" x="530" y="56" width="180" height="84" rx="8"/>
+<text x="620" y="80" class="b" text-anchor="middle">token đưa vào index</text>
+<rect class="box" x="546" y="90" width="72" height="20" rx="5"/>
+<text x="582" y="104" class="s m" text-anchor="middle">ao</text>
+<rect class="box" x="626" y="90" width="72" height="20" rx="5"/>
+<text x="662" y="104" class="s m" text-anchor="middle">thun</text>
+<rect class="box" x="546" y="114" width="72" height="20" rx="5"/>
+<text x="582" y="128" class="s m" text-anchor="middle">cotton</text>
+<rect class="box" x="626" y="114" width="72" height="20" rx="5"/>
+<text x="662" y="128" class="s m" text-anchor="middle">trang</text>
+<path class="ln" d="M140,98 H166" marker-end="url(#eh4)"/>
+<path class="ln" d="M320,98 H346" marker-end="url(#eh4)"/>
+<path class="ln" d="M500,98 H526" marker-end="url(#eh4)"/>
+<text x="360" y="172" class="s" text-anchor="middle">Câu tìm kiếm cũng đi qua đúng analyzer này → “ao trang” khớp “Áo … trắng”.</text>
+</svg><figcaption>Analyzer = tokenizer (cắt chuỗi thành từ) + token filter (biến đổi từng từ). Áp dụng cả lúc lưu lẫn lúc tìm.</figcaption></figure>
+    <ol>
+      <li><strong>Tokenizer</strong> cắt chuỗi thành từng từ. <code>standard</code> (mặc định) cắt theo khoảng trắng và dấu câu.</li>
+      <li><strong>Token filter</strong> biến đổi từng từ, chạy lần lượt: <code>lowercase</code> (chữ thường), <code>asciifolding</code> (bỏ dấu: “trắng” → “trang”), <code>stop</code> (bỏ từ vô nghĩa như “và”, “của”)…</li>
+    </ol>
+    <p>Cùng dây chuyền đó chạy <strong>hai lần</strong>: lúc lưu tài liệu (tạo token cho inverted index) và lúc tìm kiếm (tạo token từ câu khách gõ). Hai bên chỉ khớp khi token giống hệt nhau.</p>
+
+    <h2>_analyze: nhìn tận mắt</h2>
+    <p>API <code>_analyze</code> cho một analyzer chạy thử trên một câu, không lưu gì:</p>
+    <div class="term" data-title="zsh"><pre>$ curl -X POST 'localhost:9200/_analyze?filter_path=tokens.token' -H 'Content-Type: application/json' \
+    -d '{"analyzer": "standard", "text": "Áo Thun cotton TRẮNG"}'
+{"tokens":[{"token":"<span class="hl">áo</span>"},{"token":"thun"},{"token":"cotton"},{"token":"<span class="hl">trắng</span>"}]}</pre></div>
+    <p>Analyzer <code>standard</code> đã chữ thường hóa (“TRẮNG” → “trắng”) nhưng <strong>giữ nguyên dấu</strong>. Trong index có token <code>trắng</code>; khách gõ “trang” tạo token <code>trang</code> — hai chuỗi khác nhau → không khớp. Giải thích trọn vẹn cái 0 ở trên.</p>
+
+    <h2>Tự tạo analyzer cho tiếng Việt</h2>
+    <p>Thêm khối <code>analysis</code> vào <code>settings</code> của <code>mapping.json</code> (bài 4), định nghĩa analyzer tên <code>tieng_viet</code>, rồi gán cho các field <code>text</code>:</p>
+<pre data-file="mapping.json" data-add="5-12,16,18"><code class="language-json">{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0,
+    "analysis": {
+      "analyzer": {
+        "tieng_viet": {
+          "tokenizer": "standard",
+          "filter": ["lowercase", "asciifolding"]
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "ten":         { "type": "text", "analyzer": "tieng_viet",
+                       "fields": { "keyword": { "type": "keyword" } } },
+      "mo_ta":       { "type": "text", "analyzer": "tieng_viet" },
+      "danh_muc":    { "type": "keyword" },
+      "thuong_hieu": { "type": "keyword" },
+      "mau":         { "type": "keyword" },
+      "gia":         { "type": "integer" },
+      "ton_kho":     { "type": "integer" },
+      "danh_gia":    { "type": "float" },
+      "ngay_tao":    { "type": "date" }
+    }
+  }
+}</code></pre>
+    <p>Giờ mới tạo index thật và nạp 12 sản phẩm (file từ bài 3):</p>
+    <div class="term" data-title="zsh"><pre>$ curl -X PUT 'localhost:9200/san_pham?pretty' -H 'Content-Type: application/json' -d @mapping.json
+{ "acknowledged" : true, "shards_acknowledged" : true, "index" : "san_pham" }
+
+$ curl -X POST 'localhost:9200/san_pham/_bulk?refresh=true&amp;filter_path=errors' \
+    -H 'Content-Type: application/x-ndjson' --data-binary @san_pham.ndjson
+{"errors":false}
+
+$ curl 'localhost:9200/_cat/indices/san_pham?v'
+health status index    pri rep docs.count store.size
+<span class="ok">green</span>  open   san_pham   1   0         <span class="hl">12</span>     13.2kb</pre></div>
+    <p>Xanh, đủ 12 tài liệu. Kiểm tra analyzer mới — lần này gọi <code>_analyze</code> trên index <code>san_pham</code> vì analyzer <code>tieng_viet</code> chỉ tồn tại trong index đó:</p>
+    <div class="term" data-title="zsh"><pre>$ curl -X POST 'localhost:9200/san_pham/_analyze?filter_path=tokens.token' -H 'Content-Type: application/json' \
+    -d '{"analyzer": "tieng_viet", "text": "Áo Thun cotton TRẮNG"}'
+{"tokens":[{"token":"<span class="ok">ao</span>"},{"token":"thun"},{"token":"cotton"},{"token":"<span class="ok">trang</span>"}]}</pre></div>
+    <p>Token không còn dấu. Câu “ao trang” khách gõ cũng ra <code>ao</code>, <code>trang</code> → khớp:</p>
+    <div class="term" data-title="zsh"><pre>$ curl 'localhost:9200/san_pham/_search?filter_path=hits.total' -H 'Content-Type: application/json' \
+    -d '{"query": {"match": {"ten": {"query": "ao trang", "operator": "and"}}}}'
+{"hits":{"total":{"value":<span class="ok">2</span>,"relation":"eq"}}}     <span class="cm"># Áo thun cotton trắng, Áo sơ mi trắng</span></pre></div>
+
+    <div class="callout tip" data-title="Đánh đổi của việc bỏ dấu"><p>Bỏ dấu thì “ga” (gà) và “gá” khớp nhau, “ban” khớp cả “bàn”, “bán”, “bạn”. Với ô tìm sản phẩm thì lợi nhiều hơn hại. Cách làm kỹ hơn: lưu hai field — một có dấu, một không dấu — rồi tìm trên cả hai, field có dấu được cộng điểm cao hơn. Muốn tách từ ghép tiếng Việt chuẩn (“áo khoác” là một từ) thì có plugin tokenizer tiếng Việt cộng đồng; với đa số app thì <code>standard</code> + <code>asciifolding</code> là đủ.</p></div>
+
+    <h2>Các analyzer có sẵn hay gặp</h2>
+    <table>
+      <thead><tr><th>Analyzer / thành phần</th><th>Làm gì</th></tr></thead>
+      <tbody>
+        <tr><td><code>standard</code></td><td>Mặc định: cắt theo từ, chữ thường.</td></tr>
+        <tr><td><code>english</code>, <code>french</code>…</td><td>Thêm bỏ stop word và đưa từ về gốc (“running” → “run”). Không có bản tiếng Việt.</td></tr>
+        <tr><td><code>keyword</code> (tokenizer)</td><td>Không cắt gì, cả chuỗi là một token.</td></tr>
+        <tr><td><code>edge_ngram</code> (filter)</td><td>Tạo tiền tố “s”, “sn”, “sne”… để gợi ý khi đang gõ (autocomplete). Phần 2.</td></tr>
+        <tr><td><code>synonym</code> (filter)</td><td>Từ đồng nghĩa: “sneaker” = “giày thể thao”.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Analyzer gồm những phần nào?</summary><p>Một tokenizer (cắt chuỗi thành token) và không hoặc nhiều token filter (biến đổi từng token). Có thể thêm character filter chạy trước tokenizer.</p></details>
+      <details><summary>Tìm không ra kết quả mà chắc chắn dữ liệu có. Công cụ đầu tiên nên dùng?</summary><p>_analyze: so token của dữ liệu và của câu tìm kiếm xem có giống nhau không.</p></details>
+      <details><summary>Vì sao analyzer phải áp dụng cả lúc lưu lẫn lúc tìm?</summary><p>Vì khớp xảy ra giữa token với token; hai bên phải được biến đổi giống nhau mới so được.</p></details>
+    </div>
+  </section>
+
+  <section class="lesson" id="full-text" data-part="1 · Cốt lõi" data-title="Full-text search: match, điểm liên quan và gõ sai" data-minutes="18" data-practice="30" data-updated="2026-11-16" data-done="false" data-summary="Truy vấn match và multi_match, cách đọc _score, tăng trọng số field, chấp nhận gõ sai và tô sáng kết quả.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><code>match</code>: tìm trên một field text. Mặc định khớp <strong>bất kỳ</strong> từ nào (OR); thêm <code>"operator": "and"</code> để bắt khớp đủ.</li>
+        <li><code>multi_match</code>: tìm trên nhiều field, <code>"ten^3"</code> = điểm ở field tên nhân 3.</li>
+        <li><code>_score</code> (thuật toán <strong>BM25</strong>) cao khi: khớp nhiều từ, từ <strong>hiếm</strong>, field <strong>ngắn</strong>.</li>
+        <li><code>"fuzziness": "AUTO"</code> chịu được gõ sai — nhưng có thể kéo theo kết quả nhiễu.</li>
+      </ul>
+    </div>
+
+    <h2>Truy vấn tìm kiếm đầu tiên</h2>
+    <p>Mọi tìm kiếm đi qua <code>_search</code>, câu truy vấn nằm trong khóa <code>query</code>:</p>
+    <div class="term" data-title="zsh"><pre>$ curl 'localhost:9200/san_pham/_search?filter_path=hits.total,hits.hits._id,hits.hits._score,hits.hits._source.ten' \
+    -H 'Content-Type: application/json' -d '{
+    "query": { "match": { "ten": "ao thun trang" } }
+  }'
+{"hits":{"total":{"value":<span class="hl">7</span>,"relation":"eq"},"hits":[
+  {"_id":"SP001","_score":<span class="ok">3.6786628</span>,"_source":{"ten":"Áo thun cotton trắng basic"}},
+  {"_id":"SP002","_score":2.1809185,"_source":{"ten":"Áo thun oversize đen in chữ"}},
+  {"_id":"SP003","_score":1.8675627,"_source":{"ten":"Áo sơ mi trắng công sở"}},
+  {"_id":"SP007","_score":1.4375136,"_source":{"ten":"Giày sneaker trắng da"}},
+  {"_id":"SP004","_score":0.6978271,"_source":{"ten":"Áo sơ mi caro flannel"}},
+  {"_id":"SP009","_score":0.6978271,"_source":{"ten":"Áo khoác gió chống nước"}},
+  {"_id":"SP010","_score":0.6978271,"_source":{"ten":"Áo khoác jean wash bụi"}}]}}</pre></div>
+    <p>(Mình đã xuống dòng output cho dễ đọc.) Bảy kết quả, xếp theo <code>_score</code> giảm dần:</p>
+    <ul>
+      <li>SP001 khớp cả ba từ “ao”, “thun”, “trang” → điểm cao nhất.</li>
+      <li>SP002 khớp “ao”, “thun”. SP003 khớp “ao”, “trang”.</li>
+      <li>SP007 (giày) chỉ khớp “trang” — nhưng vẫn cao hơn các áo chỉ khớp “ao”. Vì sao? Xem phần BM25 dưới.</li>
+    </ul>
+    <p>Mặc định <code>match</code> nối các từ bằng <strong>OR</strong>: khớp một từ cũng được trả về, chỉ là điểm thấp. Hợp với ô tìm kiếm — người dùng vẫn thấy kết quả gần đúng. Muốn chặt hơn:</p>
+    <div class="term" data-title="zsh"><pre>$ curl 'localhost:9200/san_pham/_search?filter_path=hits.total,hits.hits._source.ten' -H 'Content-Type: application/json' -d '{
+    "query": { "match": { "ten": { "query": "ao thun trang", "operator": "and" } } }
+  }'
+{"hits":{"total":{"value":<span class="hl">1</span>,"relation":"eq"},"hits":[{"_source":{"ten":"Áo thun cotton trắng basic"}}]}}</pre></div>
+    <p>Mức giữa hai cực: <code>"minimum_should_match": "2"</code> (khớp ít nhất 2 từ) hoặc <code>"75%"</code>.</p>
+
+    <h2>_score và BM25: vì sao giày lại đứng trên áo</h2>
+    <p>Điểm được tính bằng thuật toán <strong>BM25</strong>. Không cần nhớ công thức, chỉ cần trực giác ba yếu tố:</p>
+    <table>
+      <thead><tr><th>Yếu tố</th><th>Ý nghĩa</th><th>Trong ví dụ</th></tr></thead>
+      <tbody>
+        <tr><td><strong>TF</strong> — term frequency</td><td>Từ xuất hiện càng nhiều lần trong field, điểm càng cao (có giới hạn).</td><td>Tên ngắn nên mỗi từ thường xuất hiện 1 lần.</td></tr>
+        <tr><td><strong>IDF</strong> — inverse document frequency</td><td>Từ càng <strong>hiếm</strong> trong toàn bộ index, càng có giá trị.</td><td>“ao” có trong 6/12 tên → gần như vô giá trị. “trang” chỉ 3/12 → đáng giá hơn. Nên giày (khớp “trang”) &gt; áo (khớp “ao”).</td></tr>
+        <tr><td><strong>Độ dài field</strong></td><td>Khớp trong field ngắn đáng tin hơn khớp trong đoạn văn dài.</td><td>Khớp ở <code>ten</code> có lợi hơn khớp ở <code>mo_ta</code>.</td></tr>
+      </tbody>
+    </table>
+    <p>Đúng trực giác con người: thấy chữ “trắng” (hiếm, cụ thể) quan trọng hơn chữ “áo” (cái gì cũng là áo). Muốn xem ES tính chi tiết ra sao, thêm <code>"explain": true</code> vào truy vấn.</p>
+    <div class="callout tip" data-title="Mình hiểu sai lúc đầu"><p><code>_score</code> chỉ có nghĩa <strong>so sánh trong cùng một lần tìm</strong>. Điểm 3.6 ở câu này và 7.0 ở câu khác không so với nhau được, và không phải phần trăm. Đừng đặt ngưỡng kiểu “chỉ hiện kết quả điểm &gt; 2”.</p></div>
+
+    <h2>multi_match: tìm trên nhiều field</h2>
+    <p>Khách gõ “cotton” — chữ đó có thể nằm ở tên hoặc mô tả. Tìm trên cả hai, và coi khớp ở tên quan trọng gấp 3:</p>
+    <div class="term" data-title="zsh"><pre>$ curl 'localhost:9200/san_pham/_search?filter_path=hits.hits._score,hits.hits._source.ten' -H 'Content-Type: application/json' -d '{
+    "query": { "multi_match": { "query": "cotton", "fields": ["ten^3", "mo_ta"] } }
+  }'
+{"hits":{"hits":[
+  {"_score":4.312541,"_source":{"ten":"Mũ lưỡi trai <span class="hl">cotton</span>"}},
+  {"_score":3.963138,"_source":{"ten":"Áo thun <span class="hl">cotton</span> trắng basic"}},
+  {"_score":3.4104986,"_source":{"ten":"Tất cổ ngắn <span class="hl">cotton</span> combo 5 đôi"}},
+  {"_score":1.0039146,"_source":{"ten":"Áo thun oversize đen in chữ"}}]}}</pre></div>
+    <p>Ba sản phẩm có “cotton” trong tên đứng đầu (nhờ <code>^3</code>). “Áo thun oversize” chỉ có “cotton” trong mô tả (“vải cotton dày”) nên đứng cuối nhưng vẫn được tìm thấy. Mũ đứng trên áo thun vì tên mũ ngắn hơn — yếu tố độ dài field của BM25.</p>
+
+    <h2>Gõ sai: fuzziness</h2>
+    <div class="term" data-title="zsh"><pre>$ curl 'localhost:9200/san_pham/_search?filter_path=hits.hits._score,hits.hits._source.ten' -H 'Content-Type: application/json' -d '{
+    "query": { "match": { "ten": { "query": "sneker", "fuzziness": "AUTO" } } }
+  }'
+{"hits":{"hits":[{"_score":1.9714476,"_source":{"ten":"Giày <span class="ok">sneaker</span> trắng da"}}]}}</pre></div>
+    <p><code>fuzziness</code> cho phép từ khớp lệch vài ký tự (thêm, bớt, đổi một chữ). <code>AUTO</code>: từ 1–2 ký tự phải đúng hết, 3–5 ký tự lệch được 1, từ dài hơn lệch được 2. “sneker” thiếu một chữ “a” → khớp “sneaker”.</p>
+    <div class="callout warning" data-title="Fuzzy có giá của nó"><p>Ở bài 9, tìm “giay sneker” với fuzziness ra cả <em>Quần jean slim fit</em>! Vì mô tả quần có chữ “co giãn” → token <code>gian</code>, lệch “giay” đúng một chữ. Với tiếng Việt bỏ dấu, nhiều từ ngắn chỉ khác nhau một chữ, nên fuzzy dễ kéo nhiễu. Giải pháp hay dùng: chỉ bật fuzzy cho field tên, hoặc chạy truy vấn chính xác trước, chỉ fuzzy khi không ra kết quả.</p></div>
+
+    <h2>Tô sáng từ khớp: highlight</h2>
+    <div class="term" data-title="zsh"><pre>$ curl 'localhost:9200/san_pham/_search?filter_path=hits.hits._source.ten,hits.hits.highlight' -H 'Content-Type: application/json' -d '{
+    "query": { "match": { "mo_ta": "chong nuoc" } },
+    "highlight": { "fields": { "mo_ta": {} } }
+  }'
+{"hits":{"hits":[{"_source":{"ten":"Áo khoác gió chống nước"},
+  "highlight":{"mo_ta":["Áo khoác gió mỏng nhẹ, <span class="hl">&lt;em&gt;chống&lt;/em&gt; &lt;em&gt;nước&lt;/em&gt;</span> nhẹ, gấp gọn được."]}}]}}</pre></div>
+    <p>ES bọc từ khớp trong <code>&lt;em&gt;</code> — frontend tô đậm là xong. Để ý: gõ “chong nuoc” không dấu, highlight vẫn tô đúng “chống nước” có dấu trong văn bản gốc.</p>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>match "ao thun trang" mặc định là AND hay OR?</summary><p>OR — khớp bất kỳ từ nào; tài liệu khớp nhiều từ được điểm cao hơn. Dùng operator: and hoặc minimum_should_match để chặt hơn.</p></details>
+      <details><summary>Vì sao từ “ao” đóng góp rất ít điểm?</summary><p>IDF thấp: “ao” xuất hiện ở hơn nửa số sản phẩm nên gần như không giúp phân biệt.</p></details>
+      <details><summary>"fields": ["ten^3", "mo_ta"] nghĩa là gì?</summary><p>Tìm trên cả hai field, điểm khớp ở ten được nhân 3.</p></details>
+    </div>
+  </section>
+
+  <section class="lesson" id="bool-query" data-part="1 · Cốt lõi" data-title="Bool query: kết hợp tìm, lọc, sắp xếp, phân trang" data-minutes="15" data-practice="30" data-updated="2026-11-16" data-done="false" data-summary="must, should, filter, must_not; query context và filter context; term, range, sort, from/size.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><code>bool</code> ghép nhiều điều kiện: <code>must</code> (phải khớp, có tính điểm) · <code>filter</code> (phải khớp, <strong>không</strong> tính điểm) · <code>should</code> (khớp thì cộng điểm) · <code>must_not</code> (loại ra).</li>
+        <li>Chữ người dùng gõ → <code>must</code>. Mọi bộ lọc (giá, danh mục, còn hàng) → <code>filter</code>: nhanh hơn và được cache.</li>
+        <li>Lọc chính xác: <code>term</code> (một giá trị), <code>terms</code> (nhiều giá trị), <code>range</code> (khoảng).</li>
+        <li>Phân trang <code>from</code>/<code>size</code>; sắp xếp <code>sort</code>.</li>
+      </ul>
+    </div>
+
+    <h2>Vấn đề: tìm kèm điều kiện</h2>
+    <p>Khách gõ “ao”, rồi chọn bộ lọc bên trái: thương hiệu Urban, giá dưới 500k, chỉ hàng còn trong kho. Một truy vấn <code>match</code> không đủ — cần ghép nhiều điều kiện. Đó là việc của <code>bool</code>.</p>
+
+    <h2>Bốn ngăn của bool</h2>
+    <table>
+      <thead><tr><th>Ngăn</th><th>Tài liệu phải…</th><th>Tính điểm?</th><th>Dùng cho</th></tr></thead>
+      <tbody>
+        <tr><td><code>must</code></td><td>khớp</td><td>Có</td><td>Từ khóa người dùng gõ</td></tr>
+        <tr><td><code>filter</code></td><td>khớp</td><td>Không</td><td>Bộ lọc: danh mục, giá, trạng thái</td></tr>
+        <tr><td><code>should</code></td><td>không bắt buộc (khi đã có must/filter)</td><td>Có — khớp thì cộng điểm</td><td>Ưu tiên: hàng mới, màu khách thích</td></tr>
+        <tr><td><code>must_not</code></td><td>không khớp</td><td>Không</td><td>Loại: hết hàng, đã ẩn</td></tr>
+      </tbody>
+    </table>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 202" role="img" aria-label="So sánh query context và filter context"><defs><marker id="eh5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="ea5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="zone" x="8" y="8" width="344" height="186" rx="12"/>
+<text x="24" y="32" class="b">Query context — “khớp tốt cỡ nào?”</text>
+<text x="24" y="56" class="s m">must · should · match · multi_match</text>
+<text x="24" y="82" class="s">• tính điểm _score (BM25)</text>
+<text x="24" y="102" class="s">• dùng cho phần người dùng gõ chữ</text>
+<rect class="acc" x="24" y="120" width="312" height="60" rx="8"/>
+<text x="38" y="142" class="s m">"ao thun" → SP001: 7.07</text>
+<text x="38" y="162" class="s m">            SP002: 6.54 …</text>
+<rect class="zone" x="368" y="8" width="344" height="186" rx="12"/>
+<text x="384" y="32" class="b">Filter context — “có khớp không?”</text>
+<text x="384" y="56" class="s m">filter · must_not · term · range</text>
+<text x="384" y="82" class="s">• chỉ có/không, không tính điểm</text>
+<text x="384" y="102" class="s">• được cache → nhanh hơn</text>
+<rect class="ok" x="384" y="120" width="312" height="60" rx="8"/>
+<text x="398" y="142" class="s m">gia ≤ 400000  ✓ / ✗</text>
+<text x="398" y="162" class="s m">danh_muc = "Áo thun"  ✓ / ✗</text>
+</svg><figcaption>Bool query trộn hai loại: phần chữ người dùng gõ đi vào query context; bộ lọc (giá, danh mục, còn hàng) đi vào filter.</figcaption></figure>
+
+    <h2>Viết truy vấn, từng ngăn một</h2>
+    <h3>Bước 1 — Chỉ có từ khóa</h3>
+<pre data-file="truy van" data-add="1-7"><code class="language-json">{
+  "query": {
+    "bool": {
+      "must": [ { "match": { "ten": "ao" } } ]
+    }
+  }
+}</code></pre>
+    <h3>Bước 2 — Thêm bộ lọc</h3>
+<pre data-file="truy van" data-add="5-8"><code class="language-json">{
+  "query": {
+    "bool": {
+      "must": [ { "match": { "ten": "ao" } } ],
+      "filter": [
+        { "term":  { "thuong_hieu": "Urban" } },
+        { "range": { "gia": { "lte": 500000 } } }
+      ]
+    }
+  }
+}</code></pre>
+    <ul>
+      <li><code>term</code> trên <code>thuong_hieu</code> — field <code>keyword</code>, khớp chính xác “Urban” (phân biệt hoa thường!).</li>
+      <li><code>range</code>: <code>gt</code> (&gt;), <code>gte</code> (≥), <code>lt</code> (&lt;), <code>lte</code> (≤). Dùng được cho số và ngày, vd <code>{"ngay_tao": {"gte": "now-30d"}}</code> = 30 ngày gần đây.</li>
+    </ul>
+    <h3>Bước 3 — Loại hàng hết</h3>
+<pre data-file="truy van" data-add="9-11"><code class="language-json">{
+  "query": {
+    "bool": {
+      "must": [ { "match": { "ten": "ao" } } ],
+      "filter": [
+        { "term":  { "thuong_hieu": "Urban" } },
+        { "range": { "gia": { "lte": 500000 } } }
+      ],
+      "must_not": [
+        { "term": { "ton_kho": 0 } }
+      ]
+    }
+  }
+}</code></pre>
+    <div class="term" data-title="zsh"><pre>$ curl 'localhost:9200/san_pham/_search?filter_path=hits.total,hits.hits._score,hits.hits._source.ten,hits.hits._source.gia' \
+    -H 'Content-Type: application/json' -d @truy_van.json
+{"hits":{"total":{"value":<span class="hl">1</span>,"relation":"eq"},"hits":[{"_score":0.6455264,"_source":{"ten":"Áo thun oversize đen in chữ","gia":259000}}]}}</pre></div>
+    <p>Urban có ba áo: áo thun oversize (259k), sơ mi caro (399k, <strong>hết hàng</strong>), áo khoác gió (549k, <strong>quá 500k</strong>). Chỉ còn một — đúng như mong đợi. Mẹo: lưu JSON vào file <code>truy_van.json</code> rồi <code>-d @truy_van.json</code> cho dễ sửa.</p>
+
+    <h3>Bước 4 — should: ưu tiên mà không bắt buộc</h3>
+    <p>Khách đang xem đồ màu đen — vẫn hiện mọi áo thun, nhưng đẩy áo màu đen lên đầu:</p>
+    <div class="term" data-title="zsh"><pre>$ curl 'localhost:9200/san_pham/_search?filter_path=hits.hits._score,hits.hits._source.ten' -H 'Content-Type: application/json' -d '{
+    "query": { "bool": {
+      "must":   [ { "match": { "ten": "ao thun" } } ],
+      "should": [ { "term":  { "mau": "đen" } } ]
+    } }
+  }'
+{"hits":{"hits":[
+  {"_score":<span class="ok">3.493105</span>,"_source":{"ten":"Áo thun oversize <span class="hl">đen</span> in chữ"}},
+  {"_score":2.357617,"_source":{"ten":"Áo thun cotton trắng basic"}},
+  ...]}}</pre></div>
+    <p>Không có <code>should</code>, áo thun trắng đứng đầu (điểm 2.36 &gt; 2.18 của áo đen). Có <code>should</code>, áo đen được cộng điểm và vượt lên.</p>
+
+    <h2>Sắp xếp và phân trang</h2>
+    <div class="term" data-title="zsh"><pre>$ curl 'localhost:9200/san_pham/_search?filter_path=hits.hits._source,hits.hits.sort' -H 'Content-Type: application/json' -d '{
+    "query":   { "term": { "danh_muc": "Giày" } },
+    "sort":    [ { "gia": "asc" } ],
+    "from": 0, "size": 2,
+    "_source": ["ten", "gia"]
+  }'
+{"hits":{"hits":[
+  {"_source":{"ten":"Giày sneaker trắng da","gia":890000},"sort":[890000]},
+  {"_source":{"ten":"Giày chạy bộ siêu nhẹ","gia":1290000},"sort":[1290000]}]}}</pre></div>
+    <ul>
+      <li><code>sort</code> theo field số/ngày/keyword (không sort được trên <code>text</code> — đó là lý do có <code>ten.keyword</code>). Khi đã sort theo field, <code>_score</code> không còn được dùng để xếp.</li>
+      <li><code>from</code> = bỏ qua bao nhiêu kết quả, <code>size</code> = lấy bao nhiêu. Trang 3, mỗi trang 20 → <code>from: 40, size: 20</code>.</li>
+      <li><code>_source: [...]</code> — chỉ lấy vài field, response nhẹ hơn.</li>
+    </ul>
+    <div class="callout warning"><p><code>from + size</code> mặc định không vượt quá 10.000. Muốn lướt sâu hơn (xuất dữ liệu, cuộn vô tận) dùng <code>search_after</code> — Phần 2.</p></div>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Bộ lọc giá nên đặt trong must hay filter? Vì sao?</summary><p>filter: không cần tính điểm, nhanh hơn và kết quả được cache.</p></details>
+      <details><summary>term {"thuong_hieu": "urban"} (chữ thường) có khớp "Urban" không?</summary><p>Không — keyword giữ nguyên chuỗi, phân biệt hoa thường.</p></details>
+      <details><summary>Muốn hiện mọi kết quả nhưng ưu tiên hàng giảm giá, dùng ngăn nào?</summary><p>should — khớp thì được cộng điểm, không khớp vẫn được trả về.</p></details>
+    </div>
+  </section>
+
+  <section class="lesson" id="aggregation" data-part="1 · Cốt lõi" data-title="Aggregation: bộ lọc kèm số đếm" data-minutes="12" data-practice="25" data-updated="2026-11-16" data-done="false" data-summary="Đếm theo nhóm, theo khoảng giá, tính trung bình — làm bộ lọc bên trái và báo cáo nhanh.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><strong>Aggregation</strong> = <code>GROUP BY</code> của ES, chạy <strong>trên đúng tập kết quả của query</strong>, trong cùng một request.</li>
+        <li>Ba loại dùng nhiều: <code>terms</code> (đếm theo giá trị), <code>range</code> (đếm theo khoảng), <code>avg</code>/<code>min</code>/<code>max</code>/<code>sum</code> (tính số).</li>
+        <li>Chỉ chạy trên field <code>keyword</code>, số, ngày — không trên <code>text</code>.</li>
+        <li>Chỉ cần số liệu mà không cần danh sách: <code>"size": 0</code>.</li>
+      </ul>
+    </div>
+
+    <h2>Vấn đề: con số trong ngoặc ở bộ lọc</h2>
+    <p>Mọi trang bán hàng đều có cột bộ lọc: “Áo khoác (2) · Áo thun (2) · Áo sơ mi (1)”. Con số phải thay đổi theo từ khóa khách vừa gõ. Với SQL đó là thêm vài câu <code>GROUP BY</code>; với ES, nó đi kèm luôn trong lần tìm kiếm.</p>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 212" role="img" aria-label="Một request trả về cả kết quả và số đếm cho bộ lọc"><defs><marker id="eh6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="ea6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="zone" x="8" y="8" width="220" height="196" rx="10"/>
+<text x="22" y="30" class="b">Bộ lọc bên trái</text>
+<text x="22" y="54" class="s b">Danh mục</text>
+<text x="22" y="72" class="s">☐ Áo khoác (2)</text>
+<text x="22" y="88" class="s">☐ Áo thun (2)</text>
+<text x="22" y="104" class="s">☐ Áo sơ mi (1)</text>
+<text x="22" y="130" class="s b">Giá</text>
+<text x="22" y="148" class="s">☐ dưới 300k (2)</text>
+<text x="22" y="164" class="s">☐ 300k–600k (2)</text>
+<text x="22" y="180" class="s">☐ trên 600k (1)</text>
+<rect class="box" x="244" y="8" width="220" height="196" rx="10"/>
+<text x="258" y="30" class="b">Kết quả: “ao thun”</text>
+<rect class="ok" x="258" y="42" width="192" height="30" rx="6"/>
+<text x="268" y="62" class="s">Áo thun cotton trắng</text>
+<rect class="ok" x="258" y="80" width="192" height="30" rx="6"/>
+<text x="268" y="100" class="s">Áo thun oversize đen</text>
+<rect class="ok" x="258" y="118" width="192" height="30" rx="6"/>
+<text x="268" y="138" class="s">Áo khoác gió…</text>
+<rect class="ok" x="258" y="156" width="192" height="30" rx="6"/>
+<text x="268" y="176" class="s">…</text>
+<rect class="acc" x="488" y="30" width="224" height="70" rx="8"/>
+<text x="500" y="52" class="b m">hits</text>
+<text x="500" y="72" class="s">→ danh sách sản phẩm</text>
+<text x="500" y="88" class="s">(query + filter)</text>
+<rect class="acc" x="488" y="120" width="224" height="70" rx="8"/>
+<text x="500" y="142" class="b m">aggregations</text>
+<text x="500" y="162" class="s">→ con số trong ngoặc</text>
+<text x="500" y="178" class="s">(terms, range)</text>
+<path class="ln-a" d="M486,65 H468" marker-end="url(#ea6)"/>
+<path class="ln-a" d="M486,155 C380,200 300,160 232,120" marker-end="url(#ea6)"/>
+</svg><figcaption>Một lần gọi _search trả về cả danh sách (hits) lẫn số đếm cho bộ lọc (aggregations).</figcaption></figure>
+
+    <h2>Ba aggregation trong một request</h2>
+    <div class="term" data-title="zsh"><pre>$ curl 'localhost:9200/san_pham/_search?filter_path=aggregations' -H 'Content-Type: application/json' -d '{
+    "size": 0,
+    "query": { "match": { "ten": "ao" } },
+    "aggs": {
+      "theo_thuong_hieu": { "terms": { "field": "thuong_hieu" } },
+      "khoang_gia": { "range": { "field": "gia", "ranges": [
+          { "to": 300000 }, { "from": 300000, "to": 600000 }, { "from": 600000 } ] } },
+      "gia_trung_binh": { "avg": { "field": "gia" } }
+    }
+  }'</pre></div>
+    <ul>
+      <li><code>"size": 0</code> — không cần danh sách sản phẩm, chỉ cần con số.</li>
+      <li><code>aggs</code> chứa các aggregation, mỗi cái <strong>tự đặt tên</strong> (<code>theo_thuong_hieu</code>…) để đọc kết quả.</li>
+      <li>Aggregation chạy trên <strong>6 sản phẩm khớp “ao”</strong>, không phải cả 12.</li>
+    </ul>
+    <div class="term" data-title="output (đã xuống dòng cho dễ đọc)"><pre>{"aggregations":{
+  "theo_thuong_hieu":{"buckets":[
+    {"key":"Urban","doc_count":<span class="hl">3</span>},
+    {"key":"KStore","doc_count":2},
+    {"key":"Denimo","doc_count":1}]},
+  "khoang_gia":{"buckets":[
+    {"key":"*-300000.0","to":300000.0,"doc_count":2},
+    {"key":"300000.0-600000.0","from":300000.0,"to":600000.0,"doc_count":3},
+    {"key":"600000.0-*","from":600000.0,"doc_count":1}]},
+  "gia_trung_binh":{"value":<span class="hl">397333.3333333333</span>}}}</pre></div>
+    <table>
+      <thead><tr><th>Aggregation</th><th>Kết quả</th><th>Hiển thị trên trang</th></tr></thead>
+      <tbody>
+        <tr><td><code>terms</code></td><td><code>buckets</code>: mỗi giá trị + <code>doc_count</code>, xếp theo số lượng giảm dần (mặc định top 10, đổi bằng <code>"size"</code>)</td><td>☐ Urban (3) · ☐ KStore (2) · ☐ Denimo (1)</td></tr>
+        <tr><td><code>range</code></td><td>Mỗi khoảng một bucket. Đặt <code>"key": "dưới 300k"</code> trong từng khoảng để có nhãn đẹp (bài 9).</td><td>☐ dưới 300k (2) · ☐ 300k–600k (3)…</td></tr>
+        <tr><td><code>avg</code></td><td>Một con số</td><td>“Giá trung bình 397k”</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Lồng aggregation: thống kê theo nhóm</h2>
+    <p>Aggregation lồng được vào nhau — kiểu “mỗi danh mục có giá trung bình bao nhiêu”:</p>
+<pre><code class="language-json">{
+  "size": 0,
+  "aggs": {
+    "theo_danh_muc": {
+      "terms": { "field": "danh_muc" },
+      "aggs": { "gia_tb": { "avg": { "field": "gia" } } }
+    }
+  }
+}</code></pre>
+    <p>Mỗi bucket danh mục sẽ có thêm <code>gia_tb</code> bên trong. Đây chính là thứ Kibana dùng để vẽ biểu đồ dashboard — và là lý do ES mạnh cho phân tích log (Phần 2).</p>
+    <div class="callout tip" data-title="Mình ghi nhớ thế này"><p><code>terms</code> trên field <code>text</code> sẽ báo lỗi (hoặc phải bật <code>fielddata</code> rất tốn RAM — đừng bật). Gặp lỗi “<em>Fielddata is disabled on [ten] in [san_pham]. Text fields are not optimised for … aggregations and sorting</em>” thì đổi sang <code>ten.keyword</code>. Lại là câu chuyện text vs keyword của bài 4.</p></div>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Aggregation tính trên toàn index hay trên kết quả tìm kiếm?</summary><p>Trên tập tài liệu khớp query của chính request đó.</p></details>
+      <details><summary>Muốn chỉ lấy số liệu, không cần danh sách sản phẩm, đặt gì?</summary><p>"size": 0.</p></details>
+      <details><summary>Làm bộ lọc “Màu sắc (số lượng)” dùng aggregation nào, trên field kiểu gì?</summary><p>terms trên field mau kiểu keyword.</p></details>
+    </div>
+  </section>
+
+  <section class="lesson" id="dung-o-tim-kiem" data-part="1 · Cốt lõi" data-title="Ghép lại: ô tìm kiếm sản phẩm bằng Python" data-minutes="25" data-practice="50" data-updated="2026-11-16" data-done="false" data-summary="Viết từng bước một hàm tìm kiếm có từ khóa, bộ lọc, phân trang, highlight và số đếm cho bộ lọc.">
+    <div class="callout note" data-title="Mục tiêu bài này">
+      <p>Viết file <code>tim_kiem.py</code>: hàm <code>tim_kiem(tu_khoa, danh_muc, gia_toi_da, ...)</code> mà API của shop sẽ gọi. Nó gói toàn bộ Phần 1 — analyzer không dấu (bài 5), multi_match + fuzziness + highlight (bài 6), bool filter + phân trang (bài 7), aggregation cho bộ lọc (bài 8). Mỗi bước thêm một mảnh rồi chạy thử.</p>
+    </div>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 210" role="img" aria-label="Kiến trúc app tìm kiếm sản phẩm"><defs><marker id="eh7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="ea7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="box" x="10" y="80" width="110" height="52" rx="8"/>
+<text x="65" y="102" class="b" text-anchor="middle">Người dùng</text>
+<text x="65" y="120" class="s" text-anchor="middle">ô tìm kiếm</text>
+<rect class="acc" x="170" y="80" width="140" height="52" rx="8"/>
+<text x="240" y="102" class="b" text-anchor="middle">API của shop</text>
+<text x="240" y="120" class="s" text-anchor="middle">Python · tim_kiem()</text>
+<rect class="ok" x="370" y="16" width="160" height="56" rx="8"/>
+<text x="450" y="40" class="b" text-anchor="middle">Elasticsearch</text>
+<text x="450" y="58" class="s m" text-anchor="middle">index san_pham</text>
+<rect class="warn" x="370" y="140" width="160" height="56" rx="8"/>
+<text x="450" y="164" class="b" text-anchor="middle">Database</text>
+<text x="450" y="182" class="s" text-anchor="middle">nguồn sự thật</text>
+<rect class="box" x="570" y="70" width="140" height="66" rx="8"/>
+<text x="640" y="94" class="b" text-anchor="middle">đồng bộ</text>
+<text x="640" y="112" class="s" text-anchor="middle">khi sản phẩm</text>
+<text x="640" y="126" class="s" text-anchor="middle">thêm / sửa / xóa</text>
+<path class="ln-a" d="M120,106 H166" marker-end="url(#ea7)"/>
+<path class="ln-a" d="M310,96 L366,48" marker-end="url(#ea7)"/>
+<text x="318" y="64" class="s a">tìm, lọc</text>
+<path class="ln" d="M310,116 L366,164" marker-end="url(#eh7)"/>
+<text x="318" y="158" class="s">đặt hàng</text>
+<path class="ln" d="M530,168 C560,168 600,150 618,138" marker-end="url(#eh7)"/>
+<path class="ln" d="M618,70 C600,52 560,44 534,44" marker-end="url(#eh7)"/>
+</svg><figcaption>Elasticsearch là bản sao để tìm kiếm; database vẫn là nguồn sự thật. Dữ liệu được đồng bộ từ database sang.</figcaption></figure>
+    <p>Trong app thật, ES đứng cạnh database: database giữ dữ liệu gốc (đơn hàng, tồn kho chính xác), ES giữ bản sao để tìm. Bài này tập trung vào phần “API của shop gọi ES”; phần đồng bộ ở Phần 2.</p>
+
+    <h2>Bước 0 — Cài client Python</h2>
+    <div class="term" data-title="zsh"><pre>$ uv venv --python 3.12 &amp;&amp; source .venv/bin/activate
+$ uv pip install "elasticsearch&gt;=9,&lt;10"
+$ python -c "import elasticsearch; print(elasticsearch.__versionstr__)"
+9.5.1</pre></div>
+    <div class="callout tip"><p>Phiên bản <strong>client</strong> nên cùng số lớn (major) với <strong>server</strong>: server 9.x → client 9.x. Lệch major là nguồn lỗi khó hiểu hay gặp.</p></div>
+
+    <h2>Bước 1 — Kết nối</h2>
+<pre data-file="tim_kiem.py" data-add="1-4"><code class="language-python">from elasticsearch import Elasticsearch
+
+es = Elasticsearch("http://localhost:9200")
+INDEX = "san_pham"</code></pre>
+    <div class="term" data-title="python — trong REPL"><pre>&gt;&gt;&gt; es.info()["version"]["number"]
+'9.5.5'
+&gt;&gt;&gt; es.count(index=INDEX)["count"]
+12</pre></div>
+    <p>Mọi API ở các bài trước đều có hàm tương ứng: <code>es.index()</code>, <code>es.get()</code>, <code>es.search()</code>, <code>es.bulk()</code>… Tham số giống hệt JSON đã viết, chỉ đổi sang cú pháp Python.</p>
+
+    <h2>Bước 2 — Dựng bộ lọc</h2>
+<pre data-file="tim_kiem.py (thêm tiếp)" data-add="1-9"><code class="language-python">def tim_kiem(tu_khoa, danh_muc=None, gia_toi_da=None, chi_con_hang=True, trang=1, moi_trang=5):
+    bo_loc = []
+    if danh_muc:
+        bo_loc.append({"term": {"danh_muc": danh_muc}})
+    if gia_toi_da:
+        bo_loc.append({"range": {"gia": {"lte": gia_toi_da}}})
+    if chi_con_hang:
+        bo_loc.append({"range": {"ton_kho": {"gt": 0}}})</code></pre>
+    <p>Bộ lọc là danh sách các điều kiện, thêm dần tùy khách chọn gì. Tất cả sẽ vào ngăn <code>filter</code> (bài 7): không tính điểm, được cache. “Còn hàng” viết bằng <code>range ton_kho &gt; 0</code> trong filter — cùng ý với <code>must_not ton_kho = 0</code> ở bài 7 nhưng gom hết vào một chỗ.</p>
+
+    <h2>Bước 3 — Ghép bool query</h2>
+<pre data-file="tim_kiem.py (tiếp trong hàm)" data-add="1-5"><code class="language-python">    truy_van = {"bool": {"filter": bo_loc}}
+    if tu_khoa:
+        truy_van["bool"]["must"] = [{
+            "multi_match": {"query": tu_khoa, "fields": ["ten^3", "mo_ta"], "fuzziness": "AUTO"}
+        }]</code></pre>
+    <p>Không có từ khóa (khách chỉ bấm vào danh mục) → chỉ có filter, mọi sản phẩm khớp bộ lọc đều được trả về. Có từ khóa → thêm <code>must</code> để tìm và chấm điểm.</p>
+
+    <h2>Bước 4 — Gọi search kèm phân trang, highlight, aggregation</h2>
+<pre data-file="tim_kiem.py (tiếp trong hàm)" data-add="1-15"><code class="language-python">    return es.search(
+        index=INDEX,
+        query=truy_van,
+        from_=(trang - 1) * moi_trang,
+        size=moi_trang,
+        highlight={"fields": {"ten": {}}},
+        aggs={
+            "danh_muc": {"terms": {"field": "danh_muc"}},
+            "khoang_gia": {"range": {"field": "gia", "ranges": [
+                {"key": "dưới 300k", "to": 300000},
+                {"key": "300k–600k", "from": 300000, "to": 600000},
+                {"key": "trên 600k", "from": 600000}]}},
+        },
+    )</code></pre>
+    <ul>
+      <li><code>from_</code> có dấu gạch dưới vì <code>from</code> là từ khóa của Python.</li>
+      <li>Đặt <code>"key"</code> cho từng khoảng giá để bucket có nhãn đẹp, frontend in thẳng ra.</li>
+      <li>Một request duy nhất trả về: danh sách trang hiện tại + tô sáng + số đếm cho hai bộ lọc.</li>
+    </ul>
+
+    <h2>Bước 5 — In kết quả và chạy thử</h2>
+<pre data-file="tim_kiem.py (thêm tiếp)" data-add="1-18"><code class="language-python">def in_ket_qua(kq):
+    print(f"Tìm thấy {kq['hits']['total']['value']} sản phẩm ({kq['took']} ms)")
+    for h in kq["hits"]["hits"]:
+        sp = h["_source"]
+        ten = h.get("highlight", {}).get("ten", [sp["ten"]])[0]
+        print(f"  {h['_score']:5.2f}  {ten:<45} {sp['gia']:>9,}đ")
+    print("Lọc theo danh mục:", {b["key"]: b["doc_count"] for b in kq["aggregations"]["danh_muc"]["buckets"]})
+    print("Lọc theo giá:     ", {b["key"]: b["doc_count"] for b in kq["aggregations"]["khoang_gia"]["buckets"]})
+
+if __name__ == "__main__":
+    in_ket_qua(tim_kiem("ao thun"))
+    print("---")
+    in_ket_qua(tim_kiem("ao", gia_toi_da=400000))
+    print("---")
+    in_ket_qua(tim_kiem("giay sneker"))</code></pre>
+    <div class="term" data-title="zsh"><pre>$ python tim_kiem.py
+Tìm thấy 5 sản phẩm (22 ms)
+   7.07  &lt;em&gt;Áo&lt;/em&gt; &lt;em&gt;thun&lt;/em&gt; cotton trắng basic    199,000đ
+   6.54  &lt;em&gt;Áo&lt;/em&gt; &lt;em&gt;thun&lt;/em&gt; oversize đen in chữ   259,000đ
+   2.09  &lt;em&gt;Áo&lt;/em&gt; khoác gió chống nước                549,000đ
+   2.09  &lt;em&gt;Áo&lt;/em&gt; khoác jean wash bụi                 629,000đ
+   1.94  &lt;em&gt;Áo&lt;/em&gt; sơ mi trắng công sở                 349,000đ
+Lọc theo danh mục: {'Áo khoác': 2, 'Áo thun': 2, 'Áo sơ mi': 1}
+Lọc theo giá:      {'dưới 300k': 2, '300k–600k': 2, 'trên 600k': 1}
+---
+Tìm thấy 3 sản phẩm (6 ms)
+   2.09  &lt;em&gt;Áo&lt;/em&gt; thun cotton trắng basic             199,000đ
+   1.94  &lt;em&gt;Áo&lt;/em&gt; thun oversize đen in chữ            259,000đ
+   1.94  &lt;em&gt;Áo&lt;/em&gt; sơ mi trắng công sở                 349,000đ
+Lọc theo danh mục: {'Áo thun': 2, 'Áo sơ mi': 1}
+Lọc theo giá:      {'dưới 300k': 2, '300k–600k': 1, 'trên 600k': 0}
+---
+Tìm thấy 3 sản phẩm (12 ms)
+  11.33  &lt;em&gt;Giày&lt;/em&gt; &lt;em&gt;sneaker&lt;/em&gt; trắng da         890,000đ
+   4.98  &lt;em&gt;Giày&lt;/em&gt; chạy bộ siêu nhẹ                1,290,000đ
+   <span class="err">1.64  Quần jean slim fit xanh                         459,000đ</span>
+Lọc theo danh mục: {'Giày': 2, 'Quần': 1}
+Lọc theo giá:      {'dưới 300k': 0, '300k–600k': 1, 'trên 600k': 2}</pre></div>
+    <p>Đọc output là thấy cả Phần 1 hoạt động:</p>
+    <ul>
+      <li><strong>“ao thun”</strong> không dấu vẫn ra, áo thun đứng đầu (analyzer + BM25). Chỉ 5 kết quả: <em>Áo sơ mi caro</em> hết hàng nên bị lọc (filter còn hàng).</li>
+      <li><strong>“ao” + giá ≤ 400k</strong>: 3 sản phẩm; số đếm bộ lọc thay đổi theo — “trên 600k (0)”.</li>
+      <li><strong>“giay sneker”</strong> gõ sai vẫn ra sneaker (fuzziness) — nhưng kéo theo <em>Quần jean</em>, vì “giay” khớp gần đúng chữ “giãn” trong mô tả quần. Đúng cái bẫy đã cảnh báo ở bài 6.</li>
+    </ul>
+
+    <h2>Sửa kết quả nhiễu</h2>
+    <p>Một cách gọn: chỉ dùng fuzziness trên tên, mô tả thì khớp chính xác. Thay khối <code>must</code> ở bước 3:</p>
+<pre data-file="tim_kiem.py (thay khối must)" data-add="3-6"><code class="language-python">    if tu_khoa:
+        truy_van["bool"]["must"] = [{"bool": {"should": [
+            {"match": {"ten": {"query": tu_khoa, "fuzziness": "AUTO", "boost": 3}}},
+            {"match": {"mo_ta": tu_khoa}},
+        ]}}]</code></pre>
+    <p>Chạy lại <code>tim_kiem("giay sneker")</code>: chỉ còn <strong>2 đôi giày</strong>, quần jean biến mất; “ao thun” vẫn ra đủ 5 kết quả như cũ.</p>
+    <p>Đây là kiểu tinh chỉnh <strong>relevance</strong> (độ liên quan) mà đội làm search ngoài đời làm hằng ngày: thử câu tìm kiếm thật, nhìn kết quả lạ, sửa truy vấn, thử lại. Nên lưu một danh sách “câu tìm → kết quả mong đợi” để mỗi lần sửa chạy lại kiểm tra.</p>
+
+    <h2>Thử thêm</h2>
+    <table>
+      <thead><tr><th>Gọi</th><th>Kỳ vọng</th></tr></thead>
+      <tbody>
+        <tr><td><code>tim_kiem("", danh_muc="Giày")</code></td><td>Không từ khóa, chỉ lọc: 2 đôi giày.</td></tr>
+        <tr><td><code>tim_kiem("ao", trang=2, moi_trang=3)</code></td><td>Trang 2: kết quả thứ 4–5 (tổng vẫn báo 5).</td></tr>
+        <tr><td><code>tim_kiem("ao so mi", chi_con_hang=False)</code></td><td>Có cả <em>Áo sơ mi caro</em> đang hết hàng.</td></tr>
+        <tr><td><code>tim_kiem("chong nuoc")</code></td><td>Áo khoác gió đứng đầu nhờ tìm cả trong mô tả — kèm vài kết quả nhiễu do fuzziness trên mô tả; so lại sau khi áp dụng bản sửa ở trên.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Checklist cho mọi ô tìm kiếm</h2>
+    <ul>
+      <li>Viết mapping trước khi nạp dữ liệu: text cho chữ cần tìm, keyword cho thứ cần lọc/đếm.</li>
+      <li>Analyzer phù hợp ngôn ngữ (tiếng Việt: <code>asciifolding</code>).</li>
+      <li>Chữ người dùng gõ → <code>must</code>; bộ lọc → <code>filter</code>.</li>
+      <li>Có bộ câu tìm kiếm mẫu để kiểm tra mỗi lần chỉnh relevance.</li>
+      <li>ES là bản sao để tìm; dữ liệu gốc và giao dịch ở database.</li>
+    </ul>
+  </section>
+
+  <section class="lesson" id="ban-do-khai-niem" data-part="1 · Cốt lõi" data-title="Bản đồ khái niệm: thế giới search và chọn công cụ" data-minutes="15" data-practice="15" data-updated="2026-11-16" data-done="false" data-summary="Gọi đúng tên các khái niệm lớn: relevance, precision/recall, lexical/semantic/hybrid, denormalization, đồng bộ dữ liệu, và khi nào chọn gì.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li>Mọi search engine xoay quanh hai câu hỏi: <strong>tìm ra đủ chưa</strong> (recall) và <strong>cái tìm ra có đúng không</strong> (precision).</li>
+        <li>Ba họ tìm kiếm: <strong>lexical</strong> (theo từ — Phần 1), <strong>semantic</strong> (theo nghĩa, vector), <strong>hybrid</strong> (kết hợp).</li>
+        <li>ES không có JOIN → dữ liệu được <strong>denormalize</strong> (gộp sẵn vào document). Và vì là bản sao, cần một chiến lược <strong>đồng bộ</strong> từ database.</li>
+        <li>Không phải lúc nào cũng cần Elasticsearch — có lựa chọn nhẹ hơn cho bài toán nhỏ.</li>
+      </ul>
+    </div>
+    <p>Chín bài trước dạy <em>dùng</em> Elasticsearch. Bài này gọi tên những khái niệm nằm bên dưới — thứ mà tài liệu, blog và các buổi bàn thiết kế dùng như từ vựng chung. Biết tên thì đọc gì cũng hiểu, và hỏi AI cũng đúng từ khóa.</p>
+
+    <h2>Relevance: precision và recall</h2>
+    <p>Làm search là liên tục cân hai thứ ngược chiều nhau:</p>
+    <table>
+      <thead><tr><th>Khái niệm</th><th>Câu hỏi</th><th>Ví dụ trong khóa học</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Recall</strong> (độ phủ)</td><td>Trong những thứ <em>đáng</em> tìm ra, đã tìm ra được bao nhiêu?</td><td>Bỏ dấu, fuzziness, <code>operator: or</code> → recall tăng: khách gõ kiểu gì cũng ra.</td></tr>
+        <tr><td><strong>Precision</strong> (độ chính xác)</td><td>Trong những thứ tìm ra, bao nhiêu là đúng ý?</td><td>“giay sneker” ra cả quần jean → precision giảm. <code>operator: and</code>, boost tên → precision tăng.</td></tr>
+      </tbody>
+    </table>
+    <p>Mọi nút chỉnh ở bài 5–7 thực chất là xoay giữa hai thứ này. Thêm vào đó là <strong>ranking</strong> — thứ tự: khách hiếm khi xem quá 5 kết quả đầu, nên đúng mà nằm ở trang 3 cũng như không. <strong>Relevance tuning</strong> là tên công việc chỉnh cả ba, đo bằng bộ câu tìm kiếm mẫu (bài 9).</p>
+
+    <h2>Ba họ tìm kiếm</h2>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 170" role="img" aria-label="Ba cách tìm kiếm: lexical, semantic, hybrid"><defs><marker id="eh8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="ea8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="acc" x="10" y="10" width="224" height="150" rx="10"/>
+<text x="24" y="34" class="b">Lexical (BM25)</text>
+<text x="24" y="60" class="s">khớp theo từ</text>
+<text x="24" y="80" class="s">nhanh, chính xác với mã, tên</text>
+<text x="24" y="130" class="s m">“sneaker trắng” → có từ đó</text>
+<rect class="ok" x="248" y="10" width="224" height="150" rx="10"/>
+<text x="262" y="34" class="b">Semantic (vector)</text>
+<text x="262" y="60" class="s">khớp theo nghĩa</text>
+<text x="262" y="80" class="s">hiểu đồng nghĩa, câu tự nhiên</text>
+<text x="262" y="130" class="s m">“giày đi chơi màu sáng”</text>
+<rect class="warn" x="486" y="10" width="224" height="150" rx="10"/>
+<text x="500" y="34" class="b">Hybrid</text>
+<text x="500" y="60" class="s">chạy cả hai, trộn điểm</text>
+<text x="500" y="80" class="s">thường cho kết quả tốt nhất</text>
+<text x="500" y="130" class="s m">RRF / linear combination</text>
+</svg><figcaption>Phần 1 học lexical search — nền móng của mọi thứ. Semantic và hybrid ở Phần 2.</figcaption></figure>
+    <table>
+      <thead><tr><th>Họ</th><th>Hoạt động</th><th>Giỏi</th><th>Kém</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Lexical</strong> (BM25)</td><td>Inverted index, khớp theo từ — cả Phần 1.</td><td>Mã sản phẩm, tên riêng, từ khóa chính xác. Nhanh, dễ giải thích vì sao ra.</td><td>Đồng nghĩa: “giày thể thao” không khớp “sneaker”.</td></tr>
+        <tr><td><strong>Semantic</strong> (vector)</td><td>Một model AI biến văn bản thành vector số (<em>embedding</em>); tìm vector gần nhau (<em>kNN</em>).</td><td>Câu tự nhiên, đồng nghĩa, khác ngôn ngữ: “đồ đi mưa” → áo khoác chống nước.</td><td>Mã chính xác, từ hiếm; khó giải thích; tốn tài nguyên.</td></tr>
+        <tr><td><strong>Hybrid</strong></td><td>Chạy cả hai, trộn kết quả (vd thuật toán <strong>RRF</strong> — Reciprocal Rank Fusion).</td><td>Thường cho chất lượng tốt nhất hiện nay.</td><td>Phức tạp hơn, cần đo đạc.</td></tr>
+      </tbody>
+    </table>
+    <p>Semantic search chính là phần “retrieval” trong <strong>RAG</strong> (Retrieval-Augmented Generation): tìm đoạn tài liệu liên quan rồi đưa cho LLM trả lời — nối thẳng sang khóa LangGraph. ES hỗ trợ cả ba họ trong cùng một index (Phần 2).</p>
+
+    <h2>Những khái niệm thiết kế dữ liệu</h2>
+    <table>
+      <thead><tr><th>Khái niệm</th><th>Là gì</th><th>Gặp ở đâu</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Denormalization</strong></td><td>ES không JOIN được. Thay vì bảng <code>san_pham</code> + bảng <code>thuong_hieu</code>, gộp sẵn tên thương hiệu vào mỗi document sản phẩm.</td><td>Dữ liệu mẫu: <code>thuong_hieu: "Urban"</code> nằm thẳng trong sản phẩm. Đổi tên thương hiệu = cập nhật mọi sản phẩm của nó.</td></tr>
+        <tr><td><strong>Source of truth</strong></td><td>Nơi giữ bản dữ liệu gốc, đáng tin.</td><td>Database. ES chỉ là <em>secondary index</em> (bản sao để tìm).</td></tr>
+        <tr><td><strong>Eventual consistency</strong></td><td>Bản sao đúng <em>dần dần</em>, có độ trễ so với bản gốc.</td><td>Near real-time (bài 3) + độ trễ đồng bộ: sửa giá trong DB, vài giây sau ES mới thấy. Chấp nhận được cho tìm kiếm, không được cho thanh toán.</td></tr>
+        <tr><td><strong>Đồng bộ dữ liệu</strong></td><td>Cách đưa thay đổi từ DB sang ES.</td><td>Ba kiểu: <em>dual write</em> (app ghi cả hai — đơn giản, dễ lệch), <em>CDC/outbox</em> (đọc log thay đổi của DB — chuẩn chỉnh), <em>reindex định kỳ</em> (chạy lại toàn bộ theo lịch). Phần 2.</td></tr>
+        <tr><td><strong>Shard / replica</strong></td><td>Chia index ra nhiều mảnh (chứa nhiều dữ liệu hơn) và nhân bản (chịu lỗi, đọc nhanh hơn).</td><td>Bài 2 (cluster vàng). Phần 2.</td></tr>
+        <tr><td><strong>Observability / ELK</strong></td><td>Dùng ES để gom và tìm log, metric.</td><td>Một cách dùng ES hoàn toàn khác ô tìm kiếm — Phần 2.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Khi nào chọn gì</h2>
+    <table>
+      <thead><tr><th>Bài toán</th><th>Nên thử trước</th></tr></thead>
+      <tbody>
+        <tr><td>Vài nghìn bản ghi, đã dùng PostgreSQL, tìm kiếm đơn giản</td><td><strong>Full-text search của Postgres</strong> (<code>tsvector</code>, <code>pg_trgm</code>) — khỏi thêm hệ thống mới</td></tr>
+        <tr><td>Ô tìm kiếm cho app, muốn dựng nhanh, ít vận hành</td><td><strong>Meilisearch</strong>, <strong>Typesense</strong>, hoặc dịch vụ trả phí <strong>Algolia</strong></td></tr>
+        <tr><td>Tìm kiếm phức tạp, dữ liệu lớn, cần aggregation mạnh, nhiều bộ lọc</td><td><strong>Elasticsearch</strong> hoặc <strong>OpenSearch</strong> (bản fork mã nguồn mở của ES, API gần như giống)</td></tr>
+        <tr><td>Gom log, giám sát hệ thống</td><td><strong>Elasticsearch/Kibana</strong>, OpenSearch; hoặc Grafana Loki nếu chỉ cần log đơn giản</td></tr>
+        <tr><td>Chỉ cần tìm theo nghĩa cho chatbot RAG, ít dữ liệu</td><td><strong>pgvector</strong> trong Postgres hoặc một vector database; dùng ES khi cần hybrid với lexical</td></tr>
+      </tbody>
+    </table>
+    <div class="callout warning" data-title="Sai lầm hay gặp"><ul><li><strong>Dùng ES làm database chính</strong> — không có transaction, mapping khó đổi, dễ mất dữ liệu khi cấu hình sai.</li><li><strong>Thêm ES khi chưa cần</strong> — thêm một hệ thống phải vận hành, đồng bộ, giám sát. Vài nghìn dòng thì database làm được.</li><li><strong>Chỉnh relevance theo cảm giác</strong> — luôn có bộ câu tìm mẫu để đo trước và sau.</li></ul></div>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Bật fuzziness làm tăng precision hay recall?</summary><p>Tăng recall (ra nhiều hơn), thường làm giảm precision (thêm kết quả nhiễu).</p></details>
+      <details><summary>Khách gõ “đồ đi mưa” muốn ra áo khoác chống nước. Lexical hay semantic giỏi hơn?</summary><p>Semantic — hai cụm không chung từ nào nhưng gần nghĩa. Hybrid để vẫn giữ được khớp từ chính xác.</p></details>
+      <details><summary>Vì sao dữ liệu trong ES thường được denormalize?</summary><p>ES không có JOIN giữa các index như SQL, nên gộp sẵn thông tin liên quan vào mỗi document để tìm và lọc trực tiếp.</p></details>
+      <details><summary>Shop 2.000 sản phẩm, đang dùng PostgreSQL. Có nên thêm Elasticsearch ngay?</summary><p>Chưa chắc. Thử full-text search của Postgres trước; thêm ES khi cần relevance tốt hơn, nhiều bộ lọc kèm số đếm, hoặc dữ liệu lớn dần.</p></details>
+    </div>
+  </section>
+
+  <!-- ===================== PHẦN 2 · NÂNG CAO ===================== -->
+
+  <section class="lesson" id="alias-reindex" data-part="2 · Nâng cao" data-title="Alias, reindex và index template: đổi mapping không downtime" data-minutes="10" data-practice="25" data-updated="2026-11-16" data-done="false" data-summary="Tạo index mới bằng template, chép dữ liệu bằng _reindex, chuyển alias trong một lệnh — và cái bẫy khi app vẫn ghi trong lúc chép.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li>Đổi <strong>type, analyzer, normalizer</strong> của field đã có là không được trên index đang chạy. Cách chuẩn: index mới → <code>_reindex</code> → chuyển app sang.</li>
+        <li><strong>Alias</strong> là cái tên trỏ tới index thật. App luôn gọi alias (<code>san_pham_live</code>), đổi index phía sau không phải sửa code.</li>
+        <li>Một lệnh <code>_aliases</code> chứa <code>remove</code> + <code>add</code> chạy <strong>nguyên tử</strong>. Quay lại bản cũ cũng chỉ là một lệnh.</li>
+        <li><strong>Index template</strong> giữ settings + mapping cho mọi index tên khớp mẫu (<code>san_pham_v*</code>).</li>
+      </ul>
+    </div>
+
+    <h2>Vấn đề: bộ lọc từ URL không khớp</h2>
+    <p>Frontend làm URL lọc kiểu <code>/tim?thuong_hieu=urban&amp;mau=den</code> — chữ thường, không dấu. Đưa thẳng vào <code>term</code> (bài 7) thì ra 0, vì field <code>keyword</code> giữ nguyên “Urban”, “đen”. Cách sửa đúng là gắn một <strong>normalizer</strong> (giống analyzer nhưng cho keyword: chạy <code>lowercase</code> + <code>asciifolding</code> trên cả chuỗi). Nhưng sửa mapping tại chỗ thì:</p>
+    <div class="term" data-title="zsh"><pre>$ curl 'localhost:9200/san_pham/_search?filter_path=hits.total' -H 'Content-Type: application/json' \
+    -d '{"query": {"term": {"mau": "den"}}}'
+{"hits":{"total":{"value":<span class="err">0</span>,"relation":"eq"}}}
+
+$ curl -X PUT 'localhost:9200/san_pham/_mapping?pretty' -H 'Content-Type: application/json' \
+    -d '{"properties": {"thuong_hieu": {"type": "keyword", "normalizer": "chuan_hoa"}}}'
+{
+  "error" : {
+    "root_cause" : [ ... ],
+    "type" : "illegal_argument_exception",
+    "reason" : "<span class="err">Mapper for [thuong_hieu] conflicts with existing mapper:\n\tCannot update parameter [normalizer] from [null] to [chuan_hoa]</span>"
+  },
+  "status" : 400
+}</pre></div>
+    <p>Inverted index được xây <em>lúc ghi</em> theo quy tắc lúc đó; đổi quy tắc là phải xây lại. Giống thư viện muốn xếp sách theo cách mới: dựng <strong>kệ mới</strong> bên cạnh, chuyển sách sang, rồi <strong>đổi tấm biển chỉ dẫn</strong> ở cửa — độc giả không bao giờ thấy thư viện đóng cửa. Kệ mới là index <code>san_pham_v2</code>, chuyển sách là <code>_reindex</code>, tấm biển là <strong>alias</strong>.</p>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 230" role="img" aria-label="Alias san_pham_live trỏ sang index mới"><defs><marker id="es2-h1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="es2-a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="box" x="10" y="86" width="176" height="58" rx="8"/>
+<text x="98.0" y="111" class="b" text-anchor="middle">API của shop</text>
+<text x="98.0" y="128" class="s m" text-anchor="middle">INDEX = san_pham_live</text>
+<rect class="acc" x="226" y="86" width="164" height="58" rx="8"/>
+<text x="308.0" y="111" class="b" text-anchor="middle">alias</text>
+<text x="308.0" y="128" class="s m" text-anchor="middle">san_pham_live</text>
+<rect class="ghost" x="470" y="20" width="240" height="64" rx="8"/>
+<text x="590.0" y="48" class="b" text-anchor="middle">san_pham (v1)</text>
+<text x="590.0" y="65" class="s" text-anchor="middle">mapping cũ · 12 tài liệu</text>
+<rect class="ok" x="470" y="146" width="240" height="64" rx="8"/>
+<text x="590.0" y="174" class="b" text-anchor="middle">san_pham_v2</text>
+<text x="590.0" y="191" class="s" text-anchor="middle">normalizer chuan_hoa · 12 tài liệu</text>
+<path class="ln-a" d="M186,115 H222" marker-end="url(#es2-a1)"/>
+<path class="ln dash" d="M390,104 C420,90 440,60 466,54" marker-end="url(#es2-h1)"/>
+<text x="410" y="62" class="s" text-anchor="end">trước</text>
+<path class="ln-a" d="M390,126 C420,140 440,170 466,176" marker-end="url(#es2-a1)"/>
+<text x="408" y="186" class="s a" text-anchor="end">sau</text>
+<text x="600" y="120" class="s">_reindex chép</text>
+<path class="ln dash" d="M590,86 V140" marker-end="url(#es2-h1)"/>
+</svg><figcaption>App chỉ biết tên alias. Đổi index phía sau = một lệnh _aliases (remove + add) chạy nguyên tử: không có khoảnh khắc nào alias trỏ vào hư không.</figcaption></figure>
+    <p>Trong ngành, kiểu “hai bản chạy song song, chuyển bằng một công tắc” gọi là <strong>blue-green deployment</strong>; tài liệu ES gọi là <em>zero-downtime reindex</em>.</p>
+
+    <h2>Làm từng bước</h2>
+    <h3>Bước 1 — Cho app gọi alias</h3>
+    <p>Alias không được trùng tên index đang có, nên đặt <code>san_pham_live</code> trỏ vào index hiện tại, rồi đổi một dòng trong <code>tim_kiem.py</code> (bản cuối bài 9):</p>
+    <div class="term" data-title="zsh"><pre>$ curl -X POST 'localhost:9200/_aliases?pretty' -H 'Content-Type: application/json' -d '{
+    "actions": [ { "add": { "index": "san_pham", "alias": "san_pham_live" } } ]
+  }'
+{
+  "acknowledged" : true,
+  "errors" : false
+}</pre></div>
+<pre data-file="tim_kiem.py" data-add="4"><code class="language-python">from elasticsearch import Elasticsearch
+
+es = Elasticsearch("http://localhost:9200")
+INDEX = "san_pham_live"</code></pre>
+
+    <h3>Bước 2 — Index template cho mọi phiên bản</h3>
+    <p>Sẽ còn v3, v4 (bài 12 thêm đồng nghĩa). Thay vì chép mapping mỗi lần, khai báo một lần: “index nào tên khớp <code>san_pham_v*</code> lúc tạo sẽ nhận settings + mapping này”.</p>
+<pre data-file="template_v2.json" data-add="2-3,11-13,22-23,30"><code class="language-json">{
+  "index_patterns": ["san_pham_v*"],
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "analysis": {
+        "analyzer": {
+          "tieng_viet": { "tokenizer": "standard", "filter": ["lowercase", "asciifolding"] }
+        },
+        "normalizer": {
+          "chuan_hoa": { "type": "custom", "filter": ["lowercase", "asciifolding"] }
+        }
+      }
+    },
+    "mappings": {
+      "properties": {
+        "ten":         { "type": "text", "analyzer": "tieng_viet",
+                         "fields": { "keyword": { "type": "keyword" } } },
+        "mo_ta":       { "type": "text", "analyzer": "tieng_viet" },
+        "danh_muc":    { "type": "keyword" },
+        "thuong_hieu": { "type": "keyword", "normalizer": "chuan_hoa" },
+        "mau":         { "type": "keyword", "normalizer": "chuan_hoa" },
+        "gia":         { "type": "integer" },
+        "ton_kho":     { "type": "integer" },
+        "danh_gia":    { "type": "float" },
+        "ngay_tao":    { "type": "date" }
+      }
+    }
+  }
+}</code></pre>
+    <p>So với <code>mapping.json</code> bài 5: dòng 2–3 và 30 là vỏ template (<code>index_patterns</code> + khóa <code>template</code>); dòng 11–13 định nghĩa normalizer <code>chuan_hoa</code>; dòng 22–23 gán nó cho hai field cần lọc từ URL.</p>
+
+    <h3>Bước 3 — Tạo v2, chép dữ liệu, kiểm tra</h3>
+    <div class="term" data-title="zsh"><pre>$ curl -X PUT 'localhost:9200/_index_template/san_pham_tpl?pretty' -H 'Content-Type: application/json' -d @template_v2.json
+{
+  "acknowledged" : true
+}
+
+$ curl -X PUT 'localhost:9200/san_pham_v2?pretty'
+{
+  "acknowledged" : true,
+  "shards_acknowledged" : true,
+  "index" : "<span class="ok">san_pham_v2</span>"
+}
+
+$ curl -X POST 'localhost:9200/_reindex?refresh=true&amp;filter_path=took,total,created,failures&amp;pretty' -H 'Content-Type: application/json' -d '{
+    "source": { "index": "san_pham" },
+    "dest":   { "index": "san_pham_v2" }
+  }'
+{
+  "took" : 24,
+  "total" : <span class="hl">12</span>,
+  "created" : <span class="ok">12</span>,
+  "failures" : [ ]
+}
+
+$ curl 'localhost:9200/san_pham_v2/_search?filter_path=hits.total,hits.hits._source' -H 'Content-Type: application/json' -d '{
+    "query": { "bool": { "filter": [
+      { "term": { "thuong_hieu": "urban" } },
+      { "term": { "mau": "den" } } ] } },
+    "_source": ["ten", "thuong_hieu", "mau"]
+  }'
+{"hits":{"total":{"value":<span class="ok">1</span>,"relation":"eq"},"hits":[{"_source":{"ten":"Áo thun oversize đen in chữ","thuong_hieu":"Urban","mau":"đen"}}]}}</pre></div>
+    <ul>
+      <li><code>PUT san_pham_v2</code> không gửi body nào nhưng index đã có normalizer — template được áp lúc tạo.</li>
+      <li><code>_reindex</code>: <code>total</code> = số tài liệu đọc từ nguồn, <code>created</code> = số tạo ở đích. Bằng nhau, <code>failures</code> rỗng → đủ. Nó đọc từ <code>_source</code>, nên đừng bao giờ tắt <code>_source</code>.</li>
+      <li>“urban” + “den” ra đúng áo đen của Urban; <code>_source</code> vẫn là “Urban”, “đen” — normalizer chỉ đổi giá trị dùng để so khớp.</li>
+    </ul>
+
+    <h3>Bước 4 — Chuyển alias trong một lệnh</h3>
+    <div class="term" data-title="zsh"><pre>$ curl -X POST 'localhost:9200/_aliases?pretty' -H 'Content-Type: application/json' -d '{
+    "actions": [
+      { "remove": { "index": "san_pham",    "alias": "san_pham_live" } },
+      { "add":    { "index": "san_pham_v2", "alias": "san_pham_live" } }
+    ]
+  }'
+{
+  "acknowledged" : true,
+  "errors" : false
+}
+
+$ curl 'localhost:9200/_cat/aliases?v&amp;h=alias,index'
+alias         index
+san_pham_live <span class="ok">san_pham_v2</span></pre></div>
+    <p>Hai action trong <strong>một</strong> request được áp như một giao dịch: không có khoảnh khắc nào alias trỏ vào hư không (nếu gửi thành hai request, giữa chúng app sẽ nhận lỗi <code>index_not_found</code>). Mình thử cho một action sai tên index đứng cạnh một action đúng: cả lệnh bị từ chối, action đúng cũng không được áp. Chạy lại <code>python tim_kiem.py</code> — kết quả như cũ, không sửa thêm dòng nào. Rollback = đảo hai action; vì thế giữ index cũ vài ngày rồi mới xóa.</p>
+
+    <div class="callout warning" data-title="Mình đã bị dính chỗ này: ghi trong lúc reindex"><p>Mình mô phỏng shop thêm sản phẩm SP013 sau khi <code>_reindex</code> chạy xong nhưng trước khi đổi alias. Đổi alias xong:</p>
+    <div class="term" data-title="zsh"><pre>$ curl 'localhost:9200/san_pham_live/_count?filter_path=count'
+{"count":<span class="err">12</span>}
+
+$ curl -X POST 'localhost:9200/_reindex?refresh=true&amp;filter_path=total,created,version_conflicts,failures&amp;pretty' -H 'Content-Type: application/json' -d '{
+    "conflicts": "proceed",
+    "source": { "index": "san_pham" },
+    "dest":   { "index": "san_pham_v2", "op_type": "create" }
+  }'
+{
+  "total" : 13,
+  "created" : <span class="ok">1</span>,
+  "version_conflicts" : 12,
+  "failures" : [ ]
+}</pre></div>
+    <p>SP013 vào v1 (alias lúc đó còn trỏ v1) sau khi v1 đã được chép → v2 thiếu, không lỗi nào báo. Lượt chép bù với <code>op_type: create</code> chỉ tạo tài liệu chưa có (12 cái đã có tính là xung đột, <code>conflicts: proceed</code> cho đi tiếp). Nhưng nó <strong>không</strong> cứu được sản phẩm bị sửa giá hay xóa trong khoảng đó. Ngoài đời: tạm dừng job đồng bộ trong lúc chuyển, hoặc phát lại thay đổi từ hàng đợi sự kiện (bài 14).</p></div>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Vì sao ES không cho đổi normalizer của thuong_hieu tại chỗ?</summary><p>Giá trị trong index đã tạo theo quy tắc cũ lúc ghi. Đổi quy tắc mà không xây lại thì dữ liệu cũ và câu tìm mới không khớp nhau — phải tạo index mới và reindex.</p></details>
+      <details><summary>Đổi alias bằng hai request riêng (remove rồi add) có vấn đề gì?</summary><p>Giữa hai request alias không trỏ index nào, app nhận lỗi. Đặt cả hai action trong một lệnh _aliases thì được áp nguyên tử.</p></details>
+      <details><summary>Sửa index template có đổi mapping của san_pham_v2 đang chạy không?</summary><p>Không. Template chỉ áp lúc tạo index mới có tên khớp mẫu.</p></details>
+    </div>
+
+    <h2>Hỏi AI để đi sâu hơn</h2>
+    <ul>
+      <li>“Quy trình zero-downtime reindex Elasticsearch khi app ghi liên tục: so sánh dừng ghi, dual write và phát lại thay đổi từ outbox.”</li>
+      <li>“Thay đổi mapping nào làm được bằng PUT _mapping + _update_by_query, thay đổi nào bắt buộc reindex? Cho bảng ví dụ.”</li>
+      <li>“Component template và index template khác nhau thế nào? Tách phần analysis tiếng Việt thành component template dùng chung.”</li>
+    </ul>
+  </section>
+
+  <section class="lesson" id="tim-kiem-nang-cao" data-part="2 · Nâng cao" data-title="Gợi ý khi gõ, từ đồng nghĩa và lướt sâu" data-minutes="12" data-practice="35" data-updated="2026-11-16" data-done="false" data-summary="Autocomplete bằng search_as_you_type, từ đồng nghĩa vùng miền bằng synonym_graph + Synonyms API, và search_after khi cần quá 10.000 kết quả.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><strong>Autocomplete</strong>: field con kiểu <code>search_as_you_type</code>, truy vấn <code>multi_match</code> <code>"type": "bool_prefix"</code> + <code>"operator": "and"</code>.</li>
+        <li><strong>Đồng nghĩa</strong> đặt ở analyzer <em>lúc tìm</em> (<code>search_analyzer</code>) với filter <code>synonym_graph</code>, đứng <em>sau</em> lowercase/asciifolding. Luật lưu bằng <strong>Synonyms API</strong> → sửa là có hiệu lực ngay, không reindex.</li>
+        <li>Đồng nghĩa nhiều từ biến câu tìm thành truy vấn cụm từ: precision tăng, recall có thể giảm. Đo trước/sau bằng bộ câu tìm mẫu.</li>
+        <li>Quá 10.000 kết quả: <code>from + size</code> bị chặn → dùng <strong>PIT + <code>search_after</code></strong>.</li>
+      </ul>
+    </div>
+
+    <h2>Vấn đề: khách gọi cùng món đồ bằng tên khác</h2>
+    <p>Khách miền Bắc gõ “áo phông”, “quần bò”, “tất”; miền Nam gõ “áo thun”, “quần jean”, “vớ”; rồi “nón” và “mũ”, hay tiếng Anh “jacket”. Chạy <code>tim_kiem()</code> trên index v2 (cuối bài 11) qua một script nhỏ <code>thu_tim.py</code> in số kết quả và tên:</p>
+    <div class="term" data-title="zsh"><pre>$ python thu_tim.py non vo "ao phong" "quan bo" jacket
+'non'        → <span class="err">0</span> kết quả: []
+'vo'         → <span class="err">0</span> kết quả: []
+'ao phong'   → 5 kết quả: ['Áo khoác gió chống nước', 'Áo khoác jean wash bụi', 'Áo thun oversize đen in chữ', 'Áo thun cotton trắng basic', 'Áo sơ mi trắng công sở']
+'quan bo'    → 4 kết quả: [<span class="err">'Giày chạy bộ siêu nhẹ'</span>, 'Quần short kaki be', 'Quần jean slim fit xanh', 'Giày sneaker trắng da']
+'jacket'     → <span class="err">0</span> kết quả: []</pre></div>
+    <p>“quan bo” tệ nhất: giày <strong>chạy bộ</strong> đứng đầu vì “bo” khớp “bộ” sau khi bỏ dấu. Lexical search chỉ biết so chữ (bài 10). Ví von: người bán hàng mới được dán một tờ giấy cạnh quầy — “khách hỏi nón là mũ, hỏi vớ là tất”. Tờ giấy đó là <strong>synonym list</strong>. Cùng lúc mình thêm luôn gợi ý khi gõ: hiện “sne” chưa ra gì, vì <code>match</code> chỉ khớp nguyên token <code>sneaker</code>.</p>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 250" role="img" aria-label="Analyzer lúc ghi không có đồng nghĩa, analyzer lúc tìm có"><defs><marker id="es2-h2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="es2-a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<text x="14" y="24" class="b">Lúc ghi</text>
+<rect class="box" x="14" y="36" width="150" height="50" rx="8"/>
+<text x="89.0" y="66" class="b" text-anchor="middle">“Mũ lưỡi trai”</text>
+<rect class="acc" x="200" y="36" width="200" height="50" rx="8"/>
+<text x="300.0" y="57" class="b m" text-anchor="middle">tieng_viet</text>
+<text x="300.0" y="74" class="s" text-anchor="middle">lowercase · asciifolding</text>
+<rect class="ok" x="440" y="36" width="270" height="50" rx="8"/>
+<text x="575.0" y="66" class="s m" text-anchor="middle">index: mu · luoi · trai</text>
+<path class="ln" d="M164,61 H196" marker-end="url(#es2-h2)"/>
+<path class="ln" d="M400,61 H436" marker-end="url(#es2-h2)"/>
+<text x="14" y="130" class="b">Lúc tìm</text>
+<rect class="box" x="14" y="142" width="150" height="50" rx="8"/>
+<text x="89.0" y="172" class="b" text-anchor="middle">khách gõ “nón”</text>
+<rect class="acc" x="200" y="142" width="200" height="50" rx="8"/>
+<text x="300.0" y="163" class="b m" text-anchor="middle">tieng_viet_tim</text>
+<text x="300.0" y="180" class="s" text-anchor="middle">… + dong_nghia</text>
+<rect class="ok" x="440" y="142" width="270" height="50" rx="8"/>
+<text x="575.0" y="163" class="s m" text-anchor="middle">câu tìm: non | mu</text>
+<text x="575.0" y="180" class="s" text-anchor="middle">cùng vị trí → khớp “mu”</text>
+<path class="ln-a" d="M164,167 H196" marker-end="url(#es2-a2)"/>
+<path class="ln-a" d="M400,167 H436" marker-end="url(#es2-a2)"/>
+<rect class="warn" x="200" y="206" width="200" height="36" rx="6"/>
+<text x="300.0" y="228" class="s m" text-anchor="middle">_synonyms/kstore-dong-nghia</text>
+<path class="ln dash" d="M300,206 V196" marker-end="url(#es2-h2)"/>
+<text x="410" y="229" class="s">sửa bộ đồng nghĩa → tự nạp lại</text>
+<path class="ln dash" d="M575,92 V138" marker-end="url(#es2-h2)"/>
+<text x="585" y="120" class="s">so khớp</text>
+</svg><figcaption>Đồng nghĩa chỉ chạy lúc tìm (search_analyzer). Index giữ nguyên token gốc; sửa bộ đồng nghĩa thì analyzer lúc tìm được nạp lại, không cần reindex.</figcaption></figure>
+    <p>Vì sao đồng nghĩa ở <strong>lúc tìm</strong>: index giữ nguyên token gốc nên sửa danh sách không cần reindex, và <code>synonym_graph</code> chỉ xử lý đúng cụm nhiều từ (“quần bò”) khi chạy lúc tìm.</p>
+
+    <h2>Làm từng bước</h2>
+    <h3>Bước 1 — Lưu luật bằng Synonyms API</h3>
+<pre data-file="dong_nghia.json" data-add="1-8"><code class="language-json">{
+  "synonyms_set": [
+    { "id": "mu",    "synonyms": "mũ, nón" },
+    { "id": "tat",   "synonyms": "tất, vớ" },
+    { "id": "thun",  "synonyms": "áo thun, áo phông" },
+    { "id": "jean",  "synonyms": "quần jean, quần bò" }
+  ]
+}</code></pre>
+    <div class="term" data-title="zsh"><pre>$ curl -X PUT 'localhost:9200/_synonyms/kstore-dong-nghia?pretty' -H 'Content-Type: application/json' -d @dong_nghia.json
+{
+  "result" : "<span class="ok">created</span>",
+  "reload_analyzers_details" : {
+    "_shards" : { "total" : 2, "successful" : 2, "failed" : 0 },
+    "reload_details" : [ ]
+  }
+}</pre></div>
+    <p>Mỗi <code>"a, b"</code> là luật hai chiều; viết <code>"áo phông =&gt; áo thun"</code> nếu chỉ muốn một chiều. <code>reload_details</code> rỗng vì chưa index nào dùng bộ này.</p>
+
+    <h3>Bước 2 — Template v3: analyzer lúc tìm + field gợi ý</h3>
+    <p>Thêm analyzer mới vào settings là thay đổi cần index mới (bài 11), nên cập nhật template rồi làm v3:</p>
+<pre data-file="template_v3.json" data-add="8-10,13,22,24-25"><code class="language-json">{
+  "index_patterns": ["san_pham_v*"],
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "analysis": {
+        "filter": {
+          "dong_nghia": { "type": "synonym_graph", "synonyms_set": "kstore-dong-nghia", "updateable": true }
+        },
+        "analyzer": {
+          "tieng_viet":     { "tokenizer": "standard", "filter": ["lowercase", "asciifolding"] },
+          "tieng_viet_tim": { "tokenizer": "standard", "filter": ["lowercase", "asciifolding", "dong_nghia"] }
+        },
+        "normalizer": {
+          "chuan_hoa": { "type": "custom", "filter": ["lowercase", "asciifolding"] }
+        }
+      }
+    },
+    "mappings": {
+      "properties": {
+        "ten":         { "type": "text", "analyzer": "tieng_viet", "search_analyzer": "tieng_viet_tim",
+                         "fields": { "keyword": { "type": "keyword" },
+                                     "goi_y":   { "type": "search_as_you_type", "analyzer": "tieng_viet" } } },
+        "mo_ta":       { "type": "text", "analyzer": "tieng_viet", "search_analyzer": "tieng_viet_tim" },
+        "danh_muc":    { "type": "keyword" },
+        "thuong_hieu": { "type": "keyword", "normalizer": "chuan_hoa" },
+        "mau":         { "type": "keyword", "normalizer": "chuan_hoa" },
+        "gia":         { "type": "integer" },
+        "ton_kho":     { "type": "integer" },
+        "danh_gia":    { "type": "float" },
+        "ngay_tao":    { "type": "date" }
+      }
+    }
+  }
+}</code></pre>
+    <ul>
+      <li>Dòng 8–10: filter <code>dong_nghia</code> lấy luật từ bộ <code>kstore-dong-nghia</code>; <code>updateable</code> cho phép nạp lại khi đang chạy (chỉ dùng được ở analyzer lúc tìm — gán làm <code>analyzer</code> chính, ES báo lỗi “not allowed to run in index time mode”).</li>
+      <li>Dòng 13: <code>tieng_viet_tim</code> = <code>tieng_viet</code> + đồng nghĩa ở <strong>cuối</strong>. ES chạy các filter đứng trước lên cả luật, nên luật “mũ, nón” có dấu vẫn khớp “Non”, “non”.</li>
+      <li>Dòng 22, 25: ghi bằng <code>tieng_viet</code>, tìm bằng <code>tieng_viet_tim</code>. Dòng 24: field con <code>goi_y</code> — ES tự sinh thêm <code>goi_y._2gram</code>, <code>._3gram</code> (cụm 2–3 từ) và một field tiền tố ẩn để khớp từ đang gõ dở.</li>
+    </ul>
+    <div class="term" data-title="zsh"><pre>$ curl -X PUT 'localhost:9200/_index_template/san_pham_tpl?filter_path=acknowledged' -H 'Content-Type: application/json' -d @template_v3.json
+{"acknowledged":true}
+$ curl -X PUT 'localhost:9200/san_pham_v3?filter_path=acknowledged'
+{"acknowledged":true}
+$ curl -X POST 'localhost:9200/_reindex?refresh=true&amp;filter_path=total,created,failures' -H 'Content-Type: application/json' \
+    -d '{"source": {"index": "san_pham_v2"}, "dest": {"index": "san_pham_v3"}}'
+{"total":12,"created":<span class="ok">12</span>,"failures":[]}
+
+$ curl -X POST 'localhost:9200/san_pham_v3/_analyze?filter_path=tokens.token,tokens.position,tokens.type' -H 'Content-Type: application/json' \
+    -d '{"analyzer": "tieng_viet_tim", "text": "Nón"}'
+{"tokens":[{"token":"<span class="ok">mu</span>","type":"<span class="hl">SYNONYM</span>","position":<span class="hl">0</span>},{"token":"non","type":"&lt;ALPHANUM&gt;","position":<span class="hl">0</span>}]}</pre></div>
+    <p>Đọc <code>_analyze</code>: “Nón” sinh ra <code>non</code> và <code>mu</code> (type <code>SYNONYM</code>) <strong>cùng vị trí 0</strong> — với truy vấn, nghĩa là “cái này hoặc cái kia ở cùng một chỗ”.</p>
+
+    <h3>Bước 3 — Chuyển alias, chạy lại, thêm luật khi đang chạy</h3>
+    <div class="term" data-title="zsh"><pre>$ curl -X POST 'localhost:9200/_aliases?filter_path=acknowledged' -H 'Content-Type: application/json' -d '{
+    "actions": [
+      { "remove": { "index": "san_pham_v2", "alias": "san_pham_live" } },
+      { "add":    { "index": "san_pham_v3", "alias": "san_pham_live" } }
+    ]
+  }'
+{"acknowledged":true}
+
+$ python thu_tim.py non vo "ao phong" "quan bo" jacket
+'non'        → <span class="ok">1</span> kết quả: ['Mũ lưỡi trai cotton']
+'vo'         → <span class="ok">1</span> kết quả: ['Tất cổ ngắn cotton combo 5 đôi']
+'ao phong'   → <span class="ok">2</span> kết quả: ['Áo thun cotton trắng basic', 'Áo thun oversize đen in chữ']
+'quan bo'    → <span class="ok">1</span> kết quả: ['Quần jean slim fit xanh']
+'jacket'     → 0 kết quả: []
+
+$ curl -X PUT 'localhost:9200/_synonyms/kstore-dong-nghia/khoac?pretty' -H 'Content-Type: application/json' \
+    -d '{"synonyms": "áo khoác, jacket"}'
+{
+  "result" : "created",
+  "reload_analyzers_details" : {
+    "_shards" : { "total" : 3, "successful" : 3, "failed" : 0 },
+    "reload_details" : [
+      {
+        "index" : "<span class="hl">san_pham_v3</span>",
+        "reloaded_analyzers" : [ "<span class="ok">tieng_viet_tim</span>" ],
+        "reloaded_node_ids" : [ "Nr5UZE-SQb6_kBk0O3cGlQ" ]
+      }
+    ]
+  }
+}
+
+$ python thu_tim.py jacket
+'jacket'     → <span class="ok">2</span> kết quả: ['Áo khoác gió chống nước', 'Áo khoác jean wash bụi']</pre></div>
+    <ul>
+      <li><code>tim_kiem()</code> không sửa dòng nào: <code>match</code> trên <code>ten</code>/<code>mo_ta</code> tự dùng <code>search_analyzer</code> của field. “quan bo” giờ hiểu là một khái niệm, giày chạy bộ biến mất.</li>
+      <li>Thêm luật “jacket” theo id: <code>reload_details</code> cho thấy ES tự tìm index đang dùng bộ luật và nạp lại <code>tieng_viet_tim</code>. Không reindex, không đổi alias.</li>
+    </ul>
+    <p>Còn gợi ý khi gõ, một hàm ngắn trong <code>goi_y.py</code>:</p>
+<pre data-file="goi_y.py" data-add="1-21"><code class="language-python">from tim_kiem import es, INDEX
+
+def goi_y(dang_go, so_luong=5):
+    if len(dang_go.strip()) &lt; 2:
+        return []
+    kq = es.search(
+        index=INDEX,
+        query={"multi_match": {
+            "query": dang_go,
+            "type": "bool_prefix",
+            "operator": "and",
+            "fields": ["ten.goi_y", "ten.goi_y._2gram", "ten.goi_y._3gram"],
+        }},
+        size=so_luong,
+        source=["ten"],
+    )
+    return [h["_source"]["ten"] for h in kq["hits"]["hits"]]
+
+if __name__ == "__main__":
+    for chu in ["a", "ao kh", "giay ch", "quan j", "tat co", "ao thun tr"]:
+        print(f"{chu!r:14} → {goi_y(chu)}")</code></pre>
+    <div class="term" data-title="zsh"><pre>$ python goi_y.py
+'a'            → []
+'ao kh'        → ['Áo khoác gió chống nước', 'Áo khoác jean wash bụi']
+'giay ch'      → ['Giày chạy bộ siêu nhẹ']
+'quan j'       → ['Quần jean slim fit xanh']
+'tat co'       → ['Tất cổ ngắn cotton combo 5 đôi']
+'ao thun tr'   → ['Áo thun cotton trắng basic']</pre></div>
+    <p><code>bool_prefix</code>: các từ đã gõ xong khớp nguyên từ, <strong>từ cuối</strong> khớp như tiền tố (“ao thun tr” → “trang”). Dòng 11 <code>"operator": "and"</code> quan trọng: bản đầu mình bỏ dòng này, và vì mặc định là OR, “giay ch” ra cả <em>Áo thun oversize đen in chữ</em> (“ch” là tiền tố của “chữ”). Dòng 4–5 bỏ qua chuỗi dưới 2 ký tự — mỗi phím gõ là một request, frontend nên <em>debounce</em> thêm.</p>
+
+    <div class="callout warning" data-title="Mình đã bị dính chỗ này: “ao thun” chỉ còn 2 kết quả"><p>Ở bài 9, “ao thun” ra 5 kết quả (áo thun trước, các áo khác sau). Trên v3 chỉ còn 2. Xem ES đã dịch câu tìm thành gì bằng <code>_validate/query?explain</code>:</p>
+    <div class="term" data-title="zsh"><pre>$ curl 'localhost:9200/san_pham_live/_validate/query?explain=true&amp;filter_path=explanations.explanation' -H 'Content-Type: application/json' \
+    -d '{"query": {"match": {"ten": "ao thun"}}}'
+{"explanations":[{"explanation":"(ten:<span class="hl">\"ao phong\"</span> ten:<span class="hl">\"ao thun\"</span>)"}]}</pre></div>
+    <p>Cả câu khớp một luật, nên thành hai <strong>truy vấn cụm từ</strong> (dấu ngoặc kép) — không còn từ “ao” đơn lẻ để kéo các áo khác vào. Precision tăng, recall giảm (bài 10). Muốn giữ đuôi kết quả cũ: thêm một nhánh <code>should</code> với <code>"analyzer": "tieng_viet"</code> (ghi đè search_analyzer, không đồng nghĩa) — mình thử thì ra 6 kết quả, hai áo thun vẫn đứng đầu. Bài học: mọi thay đổi relevance đều chạy lại <strong>bộ câu tìm mẫu</strong> trước/sau. Bộ 8 câu của mình (gồm các câu trên + “giay sneker”, “chong nuoc”): v2 đạt 4/8, v3 đạt 8/8, không câu cũ nào hỏng.</p></div>
+
+    <h2>Lướt quá 10.000 kết quả</h2>
+    <p>Xuất dữ liệu hay cuộn vô tận sẽ chạm giới hạn của <code>from + size</code> (bài 7):</p>
+    <div class="term" data-title="zsh"><pre>$ curl 'localhost:9200/san_pham_live/_search?pretty' -H 'Content-Type: application/json' \
+    -d '{"from": 9999, "size": 2, "query": {"match_all": {}}}'
+{
+  "error" : {
+    "root_cause" : [
+      {
+        "type" : "illegal_argument_exception",
+        "reason" : "<span class="err">Result window is too large, from + size must be less than or equal to: [10000] but was [10001].</span> See the scroll api for a more efficient way to request large data sets. This limit can be set by changing the [index.max_result_window] index level setting."
+      }
+    ],
+    ...
+  },
+  "status" : 400
+}</pre></div>
+    <p>Lý do: mỗi shard phải trả <code>from + size</code> kết quả về để gộp — trang càng sâu càng đắt. Cách chuẩn: mở <strong>point in time</strong> (<code>POST san_pham_live/_pit?keep_alive=1m</code>, một “ảnh chụp” index cố định trong lúc lướt), sort theo một field, và mỗi trang gửi <code>search_after</code> = mảng <code>sort</code> của kết quả cuối trang trước. Khi có PIT, ES tự thêm tiebreaker <code>_shard_doc</code> vào <code>sort</code>; không có tiebreaker thì hai sản phẩm cùng giá trị sort ở ranh giới trang sẽ có cái bị bỏ sót.</p>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Vì sao filter synonym_graph nên đứng sau lowercase và asciifolding?</summary><p>Các filter đứng trước được áp lên cả luật lẫn câu tìm, nên một luật “mũ, nón” khớp mọi kiểu gõ “Nón”, “non”, “nón”. Đặt trước thì chỉ khớp đúng chuỗi viết trong luật.</p></details>
+      <details><summary>Sửa danh sách đồng nghĩa có cần reindex không?</summary><p>Không, nếu đồng nghĩa nằm ở search_analyzer với filter updateable dùng synonyms_set: cập nhật qua Synonyms API là analyzer tự nạp lại.</p></details>
+      <details><summary>Gợi ý khi gõ “giay ch” ra cả áo thun in chữ. Sửa thế nào?</summary><p>Thêm "operator": "and" vào multi_match bool_prefix để mọi từ (và tiền tố cuối) đều phải khớp.</p></details>
+    </div>
+
+    <h2>Hỏi AI để đi sâu hơn</h2>
+    <ul>
+      <li>“So sánh search_as_you_type, edge_ngram tự viết và completion suggester cho autocomplete tên sản phẩm tiếng Việt không dấu: dung lượng, tốc độ, kết hợp bộ lọc.”</li>
+      <li>“Dùng _rank_eval của Elasticsearch tính precision@3 và MRR cho bộ câu tìm mẫu; cách gán rating cho tài liệu.”</li>
+      <li>“Viết hàm Python xuất toàn bộ index ra NDJSON bằng PIT + search_after, xử lý pit_id thay đổi và đóng PIT khi lỗi.”</li>
+    </ul>
+  </section>
+
+  <section class="lesson" id="semantic-hybrid" data-part="2 · Nâng cao" data-title="Semantic và hybrid search: tìm theo nghĩa" data-minutes="10" data-practice="25" data-updated="2026-11-16" data-done="false" data-summary="Embedding và dense_vector, truy vấn knn, trộn với BM25 thành hybrid search trên license basic — và vì sao RRF trả 403.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li>Một <strong>embedding model</strong> biến văn bản thành vector số; văn bản gần nghĩa → vector gần nhau. Lưu trong field <code>dense_vector</code>, tìm bằng <code>knn</code> (k láng giềng gần nhất, thuật toán HNSW).</li>
+        <li>Model dùng lúc ghi và lúc tìm <strong>phải là một</strong>. Đổi model = tạo lại toàn bộ vector.</li>
+        <li><strong>Hybrid</strong> = BM25 + vector. Trên license basic: đặt <code>query</code> và <code>knn</code> trong cùng request, điểm được <strong>cộng</strong>, chỉnh tỉ trọng bằng <code>boost</code>.</li>
+        <li>Retriever <code>rrf</code> và <code>linear</code> cần license trả phí — trên basic trả <strong>403</strong>.</li>
+      </ul>
+    </div>
+
+    <h2>Vấn đề: khách gõ ý, không gõ tên</h2>
+    <p>Khách gõ “đồ đi mưa”. Không sản phẩm nào có chữ “đi” hay “mưa”, nên mọi thứ ở bài 5–12 đều trả về 0 — kể cả danh sách đồng nghĩa, trừ khi mình đoán trước được mọi cách nói. Ví von: lexical search như tra từ điển theo chữ cái; semantic search như hỏi một người bán hàng hiểu ý — “đi mưa à? thì áo khoác chống nước”.</p>
+    <p>Cách làm: một model AI đọc mỗi tên sản phẩm và trả về một vector (vài trăm tới vài nghìn số) mô tả “nghĩa”. Câu khách gõ cũng qua model đó. Tìm = lấy các sản phẩm có vector gần vector câu hỏi nhất (đo bằng <em>cosine similarity</em>). Đây chính là phần <strong>retrieval</strong> trong RAG (bài 10).</p>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 230" role="img" aria-label="Hybrid search: điểm BM25 và điểm kNN được cộng lại"><defs><marker id="es2-h3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="es2-a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="box" x="10" y="86" width="140" height="58" rx="8"/>
+<text x="80.0" y="111" class="b" text-anchor="middle">khách gõ</text>
+<text x="80.0" y="128" class="s m" text-anchor="middle">“giay chay”</text>
+<rect class="acc" x="200" y="20" width="230" height="64" rx="8"/>
+<text x="315.0" y="48" class="b m" text-anchor="middle">query: match</text>
+<text x="315.0" y="65" class="s" text-anchor="middle">BM25 · điểm 0 → không giới hạn</text>
+<rect class="acc" x="200" y="146" width="230" height="64" rx="8"/>
+<text x="315.0" y="174" class="b m" text-anchor="middle">knn: field vec</text>
+<text x="315.0" y="191" class="s" text-anchor="middle">cosine · điểm 0 → 1</text>
+<rect class="ok" x="480" y="83" width="230" height="64" rx="8"/>
+<text x="595.0" y="111" class="b" text-anchor="middle">cộng điểm</text>
+<text x="595.0" y="128" class="s m" text-anchor="middle">0.2 × BM25 + 0.8 × kNN</text>
+<path class="ln-a" d="M150,104 C175,104 175,52 196,52" marker-end="url(#es2-a3)"/>
+<path class="ln-a" d="M150,126 C175,126 175,178 196,178" marker-end="url(#es2-a3)"/>
+<path class="ln" d="M430,52 C455,52 455,104 476,104" marker-end="url(#es2-h3)"/>
+<path class="ln" d="M430,178 C455,178 455,126 476,126" marker-end="url(#es2-h3)"/>
+<text x="315" y="120" class="s" text-anchor="middle">embedding model</text>
+<path class="ln dash" d="M315,126 V142" marker-end="url(#es2-h3)"/>
+</svg><figcaption>Trên license basic: đặt query (BM25) và knn trong cùng một request. ES cộng điểm hai nhánh, boost chỉnh tỉ trọng. RRF xếp theo thứ hạng thay vì cộng điểm, nhưng cần license trả phí.</figcaption></figure>
+
+    <h2>Làm từng bước (vector tự đặt, 3 chiều)</h2>
+    <div class="callout warning" data-title="Đọc trước"><p>Máy học không có embedding model, nên mình <strong>tự đặt tay</strong> vector 3 chiều cho dễ nhìn: chiều 1 ≈ “chống mưa/ngoài trời”, chiều 2 ≈ “thể thao”, chiều 3 ≈ “công sở”. Vector thật do model sinh ra và không đọc được bằng mắt. Mọi lệnh và output dưới đây chạy thật trên ES 9.5.5; chỉ con số trong vector là giả.</p></div>
+    <h3>Bước 1 — Mapping có dense_vector</h3>
+    <p>Dùng một index thử <code>san_pham_vec</code> với 7 sản phẩm:</p>
+<pre data-file="vec_mapping.json" data-add="8"><code class="language-json">{
+  "settings": { "number_of_shards": 1, "number_of_replicas": 0,
+    "analysis": { "analyzer": { "tieng_viet": { "tokenizer": "standard", "filter": ["lowercase", "asciifolding"] } } } },
+  "mappings": {
+    "properties": {
+      "ten":     { "type": "text", "analyzer": "tieng_viet" },
+      "ton_kho": { "type": "integer" },
+      "vec":     { "type": "dense_vector", "dims": 3, "similarity": "cosine" }
+    }
+  }
+}</code></pre>
+    <p>Dòng 8: <code>dims</code> phải bằng đúng số chiều model trả về (ví dụ 384, 768, 1024); <code>similarity: cosine</code> so <em>hướng</em> của vector. Mỗi dòng dữ liệu kèm vector, ví dụ:</p>
+<pre data-file="vec.ndjson (trích)" data-add="2,4"><code class="language-json">{"index": {"_id": "SP009"}}
+{"ten": "Áo khoác gió chống nước", "ton_kho": 30, "vec": [0.9, 0.3, 0.1]}
+{"index": {"_id": "SP008"}}
+{"ten": "Giày chạy bộ siêu nhẹ", "ton_kho": 15, "vec": [0.1, 0.9, 0.0]}</code></pre>
+
+    <h3>Bước 2 — knn: tìm theo nghĩa</h3>
+    <p>Giả sử model biến “đồ đi mưa” thành <code>[0.95, 0.2, 0.1]</code>:</p>
+    <div class="term" data-title="zsh"><pre>$ curl 'localhost:9200/san_pham_vec/_search?filter_path=hits.total' -H 'Content-Type: application/json' \
+    -d '{"query": {"match": {"ten": "do di mua"}}}'
+{"hits":{"total":{"value":<span class="err">0</span>,"relation":"eq"}}}
+
+$ curl 'localhost:9200/san_pham_vec/_search?filter_path=hits.hits._score,hits.hits._source.ten' -H 'Content-Type: application/json' -d '{
+    "knn": { "field": "vec", "query_vector": [0.95, 0.2, 0.1], "k": 3, "num_candidates": 10 },
+    "_source": ["ten"]
+  }'
+{"hits":{"hits":[
+  {"_score":<span class="ok">0.9966661</span>,"_source":{"ten":"Áo khoác gió chống nước"}},
+  {"_score":0.8288835,"_source":{"ten":"Áo khoác jean wash bụi"}},
+  {"_score":0.82355434,"_source":{"ten":"Áo sơ mi caro flannel"}}]}}</pre></div>
+    <ul>
+      <li><code>match</code> ra 0; <code>knn</code> đưa áo khoác chống nước lên đầu dù không chung chữ nào.</li>
+      <li><code>k</code>: số láng giềng trả về. <code>num_candidates</code>: số ứng viên mỗi shard xét trước khi chọn k — lớn hơn thì chính xác hơn, chậm hơn (HNSW là tìm <em>gần đúng</em>, đổi chút chính xác lấy tốc độ).</li>
+      <li>Điểm knn với cosine nằm trong khoảng 0–1. kNN <strong>luôn</strong> trả đủ k kết quả, kể cả khi chẳng cái nào thật sự liên quan — đó là điểm yếu: không có khái niệm “không khớp”.</li>
+      <li>Lọc (còn hàng, danh mục) thì đặt <code>"filter"</code> bên trong khối <code>knn</code>, để ES lọc trước rồi mới chọn k.</li>
+    </ul>
+
+    <h3>Bước 3 — Hybrid: cộng điểm BM25 và kNN</h3>
+    <p>Câu “giay chay” có chữ rõ ràng, BM25 làm tốt; vector bổ sung các món “gần nghĩa”. Đặt cả hai trong một request:</p>
+    <div class="term" data-title="zsh"><pre>$ curl 'localhost:9200/san_pham_vec/_search?filter_path=hits.hits._score,hits.hits._source.ten' -H 'Content-Type: application/json' -d '{
+    "query": { "match": { "ten": "giay chay" } }, "_source": ["ten"]
+  }'
+{"hits":{"hits":[{"_score":<span class="hl">2.8371272</span>,"_source":{"ten":"Giày chạy bộ siêu nhẹ"}},{"_score":1.2667978,"_source":{"ten":"Giày sneaker trắng da"}}]}}
+
+$ curl 'localhost:9200/san_pham_vec/_search?filter_path=hits.hits._score,hits.hits._source.ten' -H 'Content-Type: application/json' -d '{
+    "query": { "match": { "ten": { "query": "giay chay", "boost": 0.2 } } },
+    "knn":   { "field": "vec", "query_vector": [0.1, 0.8, 0.1], "k": 3, "num_candidates": 10, "boost": 0.8 },
+    "_source": ["ten"]
+  }'
+{"hits":{"hits":[
+  {"_score":<span class="ok">1.3644102</span>,"_source":{"ten":"Giày chạy bộ siêu nhẹ"}},
+  {"_score":1.045484,"_source":{"ten":"Giày sneaker trắng da"}},
+  {"_score":0.75505704,"_source":{"ten":"Áo thun cotton trắng basic"}}]}}</pre></div>
+    <p>Đọc output: BM25 cho điểm tới 2.84, còn kNN chỉ tối đa 1 — hai thang đo khác hẳn nhau. Cộng thô thì BM25 lấn át, nên mình hạ nó bằng <code>boost: 0.2</code> và nâng kNN lên 0.8. Kết quả: hai đôi giày (khớp cả chữ lẫn nghĩa) đứng đầu; áo thun lọt vào chỉ nhờ vector (chiều “thể thao” 0.3). Tỉ lệ 0.2/0.8 không có công thức — chỉnh và đo bằng bộ câu tìm mẫu (bài 12). Kiểu trộn này gọi là <strong>linear combination</strong>.</p>
+
+    <div class="callout warning" data-title="Mình đã bị dính chỗ này: RRF trả 403"><p>Tài liệu và blog hay viết hybrid bằng retriever <code>rrf</code> (Reciprocal Rank Fusion: trộn theo <em>thứ hạng</em>, không cần cân thang điểm). Chạy trên ES tự cài với license mặc định:</p>
+    <div class="term" data-title="zsh"><pre>$ curl 'localhost:9200/san_pham_vec/_search?pretty&amp;filter_path=error.type,error.reason,status' -H 'Content-Type: application/json' -d '{
+    "retriever": { "rrf": { "retrievers": [
+      { "standard": { "query": { "match": { "ten": "ao khoac" } } } },
+      { "knn": { "field": "vec", "query_vector": [0.95, 0.2, 0.1], "k": 3, "num_candidates": 10 } }
+    ] } }
+  }'
+{
+  "error" : {
+    "root_cause" : [ ... ],
+    "type" : "security_exception",
+    "reason" : "<span class="err">current license is non-compliant for [Reciprocal Rank Fusion (RRF)]</span>",
+    "license.expired.feature" : "Reciprocal Rank Fusion (RRF)"
+  },
+  "status" : <span class="err">403</span>
+}</pre></div>
+    <p>License “basic” (miễn phí) không có RRF; retriever <code>linear</code> cũng vậy. Kiểm tra license bằng <code>GET _license</code> trước khi chọn kiến trúc. Trên basic: dùng cách cộng điểm có boost như bước 3, hoặc tự chạy hai truy vấn rồi trộn RRF trong code Python (công thức chỉ vài dòng).</p></div>
+
+    <h2>Ngoài đời: semantic_text</h2>
+    <p>Tự gọi model rồi nhét vector vào như trên là cách “tự quản”. ES còn có field <code>semantic_text</code>: khai báo một <em>inference endpoint</em> (model ELSER/E5 của Elastic, hoặc dịch vụ ngoài như OpenAI, Cohere), ES tự tạo embedding lúc ghi và lúc tìm, tự chia văn bản dài thành đoạn (<em>chunking</em>). Mẫu dưới <strong>không chạy ở đây</strong> vì máy học không có model:</p>
+<pre data-file="mẫu — chưa chạy" data-add="3"><code class="language-json">{ "mappings": { "properties": {
+    "ten":    { "type": "text", "copy_to": "ten_ngu_nghia" },
+    "ten_ngu_nghia": { "type": "semantic_text", "inference_id": "&lt;id inference endpoint&gt;" }
+} } }</code></pre>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Vì sao không nên cộng thẳng điểm BM25 và điểm kNN với boost bằng nhau?</summary><p>Hai thang điểm khác nhau: BM25 không có trần (ở đây tới 2.84), kNN cosine nằm trong 0–1. Cộng thô thì BM25 lấn át; phải chỉnh boost và đo, hoặc dùng RRF (trộn theo thứ hạng).</p></details>
+      <details><summary>Đổi sang embedding model mới thì phải làm gì với dữ liệu?</summary><p>Tạo lại vector cho mọi tài liệu bằng model mới (thường là index mới + alias, bài 11). Vector của hai model khác nhau không so với nhau được.</p></details>
+      <details><summary>Khách tìm mã “SP007”. Lexical hay semantic tốt hơn?</summary><p>Lexical. Mã, tên riêng, từ hiếm là điểm mạnh của BM25 và điểm yếu của vector — lý do hybrid thường thắng.</p></details>
+    </div>
+
+    <h2>Hỏi AI để đi sâu hơn</h2>
+    <ul>
+      <li>“Tự cài RRF trong Python: chạy truy vấn BM25 và knn riêng trên Elasticsearch license basic rồi trộn bằng công thức 1/(k + rank).”</li>
+      <li>“Chọn embedding model đa ngôn ngữ hỗ trợ tiếng Việt cho tìm sản phẩm; so sánh số chiều, tốc độ, chi phí, và cách tạo vector hàng loạt rồi nạp bằng _bulk.”</li>
+      <li>“Chia tài liệu dài thành chunk, lưu embedding vào Elasticsearch làm retriever cho chatbot RAG viết bằng LangGraph.”</li>
+    </ul>
+  </section>
+
+  <section class="lesson" id="dong-bo-du-lieu" data-part="2 · Nâng cao" data-title="Đồng bộ dữ liệu từ database: outbox, CDC và thứ tự cập nhật" data-minutes="10" data-practice="30" data-updated="2026-11-16" data-done="false" data-summary="Vì sao dual write làm lệch dữ liệu, viết một worker outbox chạy được bằng SQLite + Python, và chặn cập nhật đến sai thứ tự bằng external version.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li>Database là nguồn sự thật, ES là bản sao để tìm (bài 9). Cần một đường đưa mọi thay đổi sang ES, không mất, không sai thứ tự.</li>
+        <li><strong>Dual write</strong> (app ghi DB rồi ghi ES) đơn giản nhưng lệch im lặng khi bước hai lỗi. <strong>Outbox</strong>: ghi dữ liệu + một dòng “có thay đổi” trong <em>cùng transaction</em>, worker gửi sang ES.</li>
+        <li>Worker gửi <strong>bản mới nhất</strong> trong DB, không tin nội dung sự kiện → chạy lại bao nhiêu lần cũng đúng (<em>idempotent</em>).</li>
+        <li><code>version_type=external</code> chặn bản cũ đè bản mới khi cập nhật đến sai thứ tự.</li>
+      </ul>
+    </div>
+
+    <h2>Vấn đề: hai nơi lưu, một nơi quên</h2>
+    <p>Cách ai cũng viết đầu tiên: sửa giá trong DB xong thì <code>es.index(...)</code>. Nếu ES đang khởi động lại, mạng chập, hay app chết giữa hai lệnh, DB đã đổi còn ES giữ giá cũ — không lỗi nào báo, khách thấy giá sai tới khi có ai để ý. Ví von: thủ kho ghi sổ nhập hàng rồi <em>nhớ</em> báo cho quầy bán; quên một lần là quầy bán sai. Cách chắc hơn: mỗi lần ghi sổ thì ghi luôn một dòng vào “sổ cần báo” cùng trang, và một người chuyên đi đọc sổ đó báo cho quầy. Đó là <strong>transactional outbox</strong>.</p>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 230" role="img" aria-label="Outbox pattern đồng bộ database sang Elasticsearch"><defs><marker id="es2-h4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="es2-a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="box" x="10" y="90" width="130" height="52" rx="8"/>
+<text x="75.0" y="112" class="b" text-anchor="middle">API của shop</text>
+<text x="75.0" y="129" class="s" text-anchor="middle">sửa giá SP001</text>
+<rect class="zone" x="180" y="20" width="250" height="190" rx="12"/>
+<text x="196" y="42" class="b">Database · một transaction</text>
+<rect class="box" x="196" y="58" width="218" height="56" rx="8"/>
+<text x="305.0" y="82" class="b m" text-anchor="middle">bảng san_pham</text>
+<text x="305.0" y="99" class="s" text-anchor="middle">dữ liệu gốc</text>
+<rect class="warn" x="196" y="130" width="218" height="56" rx="8"/>
+<text x="305.0" y="154" class="b m" text-anchor="middle">bảng outbox</text>
+<text x="305.0" y="171" class="s m" text-anchor="middle">SP001 · luu · da_gui=0</text>
+<rect class="acc" x="470" y="90" width="110" height="52" rx="8"/>
+<text x="525.0" y="112" class="b" text-anchor="middle">worker</text>
+<text x="525.0" y="129" class="s" text-anchor="middle">vòng lặp</text>
+<rect class="ok" x="610" y="90" width="100" height="52" rx="8"/>
+<text x="660.0" y="112" class="b" text-anchor="middle">ES</text>
+<text x="660.0" y="129" class="s m" text-anchor="middle">_bulk</text>
+<path class="ln-a" d="M140,116 H176" marker-end="url(#es2-a4)"/>
+<path class="ln" d="M414,158 C440,158 445,126 466,124" marker-end="url(#es2-h4)"/>
+<path class="ln dash" d="M466,108 C445,100 440,86 414,86" marker-end="url(#es2-h4)"/>
+<text x="472" y="80" class="s">đọc bản mới</text>
+<path class="ln-a" d="M580,116 H606" marker-end="url(#es2-a4)"/>
+</svg><figcaption>Outbox: ghi dữ liệu và ghi “có thay đổi” trong cùng một transaction, nên không bao giờ mất sự kiện. Worker đọc outbox, lấy bản mới nhất trong DB, gửi _bulk sang ES rồi đánh dấu đã gửi.</figcaption></figure>
+    <table>
+      <thead><tr><th>Cách</th><th>Hoạt động</th><th>Đánh đổi</th></tr></thead>
+      <tbody>
+        <tr><td>Dual write</td><td>App ghi DB rồi ghi ES.</td><td>Đơn giản; lệch im lặng khi bước hai lỗi.</td></tr>
+        <tr><td><strong>Outbox</strong></td><td>Cùng transaction ghi bảng outbox; worker đọc và gửi sang ES (thường qua Kafka/RabbitMQ khi lớn).</td><td>Không mất sự kiện, thử lại được; thêm một worker.</td></tr>
+        <tr><td><strong>CDC</strong></td><td>Debezium đọc log thay đổi của DB (WAL Postgres, binlog MySQL) → Kafka → ES.</td><td>App không sửa code; thêm hạ tầng để vận hành.</td></tr>
+        <tr><td>Reindex định kỳ</td><td>Cron dựng lại index mới, đổi alias (bài 11).</td><td>Tự vá mọi chỗ lệch; trễ theo chu kỳ. Hay dùng <em>kèm</em> cách khác.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Làm từng bước: outbox với SQLite</h2>
+    <p>SQLite có sẵn trong Python, đủ để thấy cơ chế transaction; thay bằng PostgreSQL thì y hệt. Script <code>dong_bo.py</code> dùng lại <code>es</code>, <code>INDEX</code> (= <code>san_pham_live</code>) từ <code>tim_kiem.py</code>.</p>
+    <h3>Bước 1 — Hai bảng và hàm ghi</h3>
+<pre data-file="dong_bo.py" data-add="1-17"><code class="language-python">import json, sqlite3, sys, os
+from elasticsearch import helpers
+from tim_kiem import es, INDEX
+
+db = sqlite3.connect("shop.db")
+db.execute("CREATE TABLE IF NOT EXISTS san_pham (id TEXT PRIMARY KEY, du_lieu TEXT)")
+db.execute("CREATE TABLE IF NOT EXISTS outbox (stt INTEGER PRIMARY KEY AUTOINCREMENT, sp_id TEXT, thao_tac TEXT, da_gui INTEGER DEFAULT 0)")
+
+def luu_san_pham(sp_id, sp):
+    with db:  # một transaction: ghi bảng chính + ghi outbox
+        db.execute("INSERT OR REPLACE INTO san_pham VALUES (?, ?)", (sp_id, json.dumps(sp, ensure_ascii=False)))
+        db.execute("INSERT INTO outbox (sp_id, thao_tac) VALUES (?, 'luu')", (sp_id,))
+
+def xoa_san_pham(sp_id):
+    with db:
+        db.execute("DELETE FROM san_pham WHERE id = ?", (sp_id,))
+        db.execute("INSERT INTO outbox (sp_id, thao_tac) VALUES (?, 'xoa')", (sp_id,))</code></pre>
+    <p>Dòng 10 và 15: <code>with db:</code> mở một transaction — hai lệnh <code>INSERT</code> cùng thành công hoặc cùng bị hủy. Không bao giờ có chuyện dữ liệu đổi mà outbox không ghi.</p>
+
+    <h3>Bước 2 — Worker</h3>
+<pre data-file="dong_bo.py (thêm tiếp)" data-add="1-14"><code class="language-python">def worker():
+    viec = db.execute("SELECT stt, sp_id, thao_tac FROM outbox WHERE da_gui = 0 ORDER BY stt").fetchall()
+    lenh = []
+    for sp_id in dict.fromkeys(v[1] for v in viec):  # mỗi sản phẩm gửi một lần
+        dong = db.execute("SELECT du_lieu FROM san_pham WHERE id = ?", (sp_id,)).fetchone()
+        if dong is None:  # đã bị xóa trong DB → xóa trong ES
+            lenh.append({"_op_type": "delete", "_index": INDEX, "_id": sp_id})
+        else:             # luôn gửi bản MỚI NHẤT trong DB
+            lenh.append({"_op_type": "index", "_index": INDEX, "_id": sp_id, "_source": json.loads(dong[0])})
+    ok, loi = helpers.bulk(es, lenh, raise_on_error=False, refresh="wait_for")
+    loi = [e for e in loi if e.get("delete", {}).get("status") != 404]  # xóa thứ ES chưa có: bỏ qua
+    with db:
+        db.executemany("UPDATE outbox SET da_gui = 1 WHERE stt = ?", [(v[0],) for v in viec])
+    print(f"worker: {len(viec)} sự kiện → {len(lenh)} lệnh, {len(loi)} lỗi")</code></pre>
+    <ul>
+      <li>Dòng 4: gộp sự kiện theo sản phẩm — sửa giá 5 lần liên tiếp chỉ cần gửi 1 lần.</li>
+      <li>Dòng 5–9: <strong>đọc trạng thái hiện tại trong DB</strong> thay vì tin vào loại sự kiện. Bản nháp đầu mình làm theo <code>thao_tac</code> và bị <code>TypeError</code> ngay: sự kiện “luu” của SP013 đến lúc dòng đó đã bị xóa. Đọc bản mới nhất thì thứ tự sự kiện không còn quan trọng.</li>
+      <li>Dòng 10: <code>helpers.bulk</code> gửi tất cả bằng <code>_bulk</code> (bài 3). Dòng 11: xóa một tài liệu ES chưa từng có trả 404 — vô hại.</li>
+      <li>Dòng 12–13: chỉ đánh dấu đã gửi <em>sau khi</em> gửi xong. Worker chết giữa chừng thì lần sau gửi lại — gửi lại cũng không sao vì luôn là bản mới nhất.</li>
+    </ul>
+
+    <h3>Bước 3 — Chạy thử</h3>
+<pre data-file="dong_bo.py (thêm tiếp)" data-add="1-11"><code class="language-python">if __name__ == "__main__":
+    sp = es.get(index=INDEX, id="SP001")["_source"]
+    sp["gia"] = 179000
+    luu_san_pham("SP001", sp)
+    luu_san_pham("SP013", {"ten": "Áo polo cotton xanh navy", "danh_muc": "Áo thun", "gia": 279000, "ton_kho": 50})
+    xoa_san_pham("SP013")
+    print("outbox:", db.execute("SELECT stt, sp_id, thao_tac, da_gui FROM outbox").fetchall())
+    worker()
+    print("ES:", es.get(index=INDEX, id="SP001", source_includes=["ten", "gia"])["_source"])
+    print("ES có SP013?", es.exists(index=INDEX, id="SP013").body)
+    worker()</code></pre>
+    <div class="term" data-title="zsh"><pre>$ python dong_bo.py
+outbox: [(1, 'SP001', 'luu', 0), (2, 'SP013', 'luu', 0), (3, 'SP013', 'xoa', 0)]
+worker: <span class="hl">3 sự kiện → 2 lệnh</span>, <span class="ok">0 lỗi</span>
+ES: {'ten': 'Áo thun cotton trắng basic', 'gia': <span class="ok">179000</span>}
+ES có SP013? <span class="ok">False</span>
+worker: 0 sự kiện → 0 lệnh, 0 lỗi</pre></div>
+    <ul>
+      <li>Dòng <code>outbox</code>: ba sự kiện, <code>da_gui = 0</code>. SP013 được thêm rồi xóa ngay.</li>
+      <li><code>3 sự kiện → 2 lệnh</code>: SP001 thành lệnh <code>index</code>, hai sự kiện của SP013 gộp thành một lệnh <code>delete</code>.</li>
+      <li>ES có giá mới 179.000đ; SP013 không tồn tại — đúng như DB. Lần gọi worker thứ hai không còn việc gì.</li>
+    </ul>
+    <p>Ngoài đời, worker chạy vòng lặp mỗi vài giây (hoặc Debezium đọc thẳng bảng outbox — gọi là <em>outbox + CDC</em>). Độ trễ vài giây đó chính là <strong>eventual consistency</strong> ở bài 10. (Sau thí nghiệm mình trả giá SP001 về 199.000đ.)</p>
+
+    <div class="callout warning" data-title="Mình đã bị dính chỗ này: cập nhật đến sai thứ tự"><p>Khi có <em>nhiều</em> worker chạy song song, hai lần sửa giá có thể tới ES ngược thứ tự: bản cũ đến sau và đè bản mới. Cách chặn: gửi kèm một số phiên bản từ DB (ví dụ <code>updated_at</code> tính bằng mili giây) với <code>version_type=external</code> — ES chỉ nhận khi số mới <strong>lớn hơn</strong> số đang lưu. Thử trên một index tạm:</p>
+    <div class="term" data-title="zsh"><pre>$ curl -X PUT 'localhost:9200/thu_phien_ban/_doc/SP001?version=1763300000002&amp;version_type=external&amp;filter_path=result,_version' \
+    -H 'Content-Type: application/json' -d '{"ten": "Áo thun cotton trắng basic", "gia": 169000}'
+{"_version":1763300000002,"result":"created"}
+$ curl -X PUT 'localhost:9200/thu_phien_ban/_doc/SP001?version=1763300000001&amp;version_type=external&amp;pretty' \
+    -H 'Content-Type: application/json' -d '{"ten": "Áo thun cotton trắng basic", "gia": 179000}'
+{
+  "error" : {
+    "root_cause" : [ ... ],
+    "type" : "version_conflict_engine_exception",
+    "reason" : "<span class="err">[SP001]: version conflict, current version [1763300000002] is higher or equal to the one provided [1763300000001]</span>",
+    ...
+  },
+  "status" : <span class="err">409</span>
+}
+$ curl 'localhost:9200/thu_phien_ban/_doc/SP001?filter_path=_version,_source.gia'
+{"_version":1763300000002,"_source":{"gia":<span class="ok">169000</span>}}</pre></div>
+    <p>Bản cũ (…001) bị từ chối với 409, giá mới 169.000đ được giữ. Worker coi 409 là “đã có bản mới hơn” và bỏ qua, không phải lỗi.</p></div>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Vì sao outbox không mất sự kiện còn dual write thì có thể?</summary><p>Outbox ghi dữ liệu và dòng sự kiện trong cùng một transaction của DB: cả hai cùng có hoặc cùng không. Dual write có hai bước ở hai hệ thống, bước hai lỗi là lệch.</p></details>
+      <details><summary>Vì sao worker nên đọc bản mới nhất trong DB thay vì gửi nội dung có sẵn trong sự kiện?</summary><p>Để gửi lại hay gửi trùng vẫn ra đúng trạng thái cuối (idempotent), và thứ tự sự kiện không còn quan trọng; dòng đã xóa thì gửi lệnh delete.</p></details>
+      <details><summary>version_type=external dùng số phiên bản lấy từ đâu và giải quyết vấn đề gì?</summary><p>Từ nguồn sự thật, ví dụ cột updated_at hoặc số phiên bản trong DB. Nó chặn bản cũ đến muộn đè lên bản mới khi nhiều worker chạy song song.</p></details>
+    </div>
+
+    <h2>Hỏi AI để đi sâu hơn</h2>
+    <ul>
+      <li>“Thiết kế outbox pattern đồng bộ PostgreSQL sang Elasticsearch bằng worker Python: SELECT … FOR UPDATE SKIP LOCKED, thử lại có backoff, dọn bảng outbox.”</li>
+      <li>“Cấu hình Debezium + Kafka Connect (Elasticsearch sink) đẩy bảng products từ Postgres sang Elasticsearch; xử lý xóa và thay đổi schema.”</li>
+      <li>“Đổi tên một thương hiệu trong DB thì cập nhật mọi sản phẩm đã denormalize trong Elasticsearch thế nào: _update_by_query với script hay reindex?”</li>
+    </ul>
+  </section>
+
+  <section class="lesson" id="log-observability" data-part="2 · Nâng cao" data-title="Log và observability: data stream, ILM và ELK" data-minutes="10" data-practice="25" data-updated="2026-11-16" data-done="false" data-summary="Gom log của các service vào một data stream, tự xoay vòng và xóa log cũ bằng ILM, đếm lỗi theo service và theo thời gian — nền của Kibana.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li>Log là dữ liệu <strong>chỉ thêm, theo thời gian</strong>. Lưu bằng <strong>data stream</strong>: một tên để ghi, phía sau ES tự tạo chuỗi <em>backing index</em> ẩn.</li>
+        <li>Data stream chỉ nhận ghi kiểu <code>create</code>, bắt buộc có field <code>@timestamp</code>, tạo qua index template có <code>"data_stream": {}</code>.</li>
+        <li><strong>ILM</strong> (Index Lifecycle Management): tự <em>rollover</em> sang index mới theo tuổi/kích thước và xóa index đủ tuổi.</li>
+        <li>Tìm log = mọi thứ ở Phần 1: <code>term</code> level, <code>range</code> thời gian, aggregation theo service — chính là thứ Kibana vẽ thành biểu đồ.</li>
+      </ul>
+    </div>
+
+    <h2>Vấn đề: log nằm rải rác ở từng container</h2>
+    <p>Kiệt Store giờ có <code>api-tim-kiem</code>, <code>api-don-hang</code>, mỗi service vài container. Khách báo “đặt hàng lỗi lúc 0 giờ 30” — phải SSH vào từng máy, <code>grep</code> từng file, và container đã khởi động lại thì log mất luôn. Ví von: mỗi phòng ban giữ sổ nhật ký riêng; muốn điều tra thì gom về một <strong>phòng lưu trữ</strong> chung, xếp theo ngày, sổ quá 7 ngày thì hủy. Phòng lưu trữ là Elasticsearch, xếp theo ngày là data stream, quy tắc hủy là ILM.</p>
+    <p>Bộ quen thuộc gọi là <strong>ELK</strong>: Elasticsearch (lưu, tìm) + Logstash (xử lý log) + Kibana (giao diện, dashboard). Ngày nay phần thu log thường là <strong>Filebeat</strong> hoặc <strong>Elastic Agent</strong> chạy cạnh container. Bài này làm phần lõi phía ES bằng curl; Kibana và Filebeat không chạy ở đây.</p>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 220" role="img" aria-label="Data stream kstore-logs và các backing index"><defs><marker id="es2-h5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="es2-a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="box" x="10" y="80" width="150" height="58" rx="8"/>
+<text x="85.0" y="105" class="b" text-anchor="middle">app ghi log</text>
+<text x="85.0" y="122" class="s m" text-anchor="middle">_bulk create</text>
+<rect class="acc" x="200" y="80" width="150" height="58" rx="8"/>
+<text x="275.0" y="105" class="b" text-anchor="middle">data stream</text>
+<text x="275.0" y="122" class="s m" text-anchor="middle">kstore-logs</text>
+<rect class="ghost" x="400" y="14" width="310" height="52" rx="8"/>
+<text x="555.0" y="36" class="s m" text-anchor="middle">.ds-kstore-logs-…-000001</text>
+<text x="555.0" y="53" class="s" text-anchor="middle">cũ · chỉ đọc · ILM xóa sau 7 ngày</text>
+<rect class="ok" x="400" y="82" width="310" height="52" rx="8"/>
+<text x="555.0" y="104" class="s m" text-anchor="middle">.ds-kstore-logs-…-000002</text>
+<text x="555.0" y="121" class="s" text-anchor="middle">write index · nhận log mới</text>
+<rect class="ghost" x="400" y="150" width="310" height="52" rx="8"/>
+<text x="555.0" y="172" class="s m" text-anchor="middle">…-000003</text>
+<text x="555.0" y="189" class="s" text-anchor="middle">tạo khi rollover (1 ngày hoặc 10GB)</text>
+<path class="ln-a" d="M160,109 H196" marker-end="url(#es2-a5)"/>
+<path class="ln-a" d="M350,109 H396" marker-end="url(#es2-a5)"/>
+<path class="ln dash" d="M350,96 C375,80 375,40 396,40" marker-end="url(#es2-h5)"/>
+<text x="200" y="166" class="s">tìm: đọc mọi backing index</text>
+</svg><figcaption>Data stream là một tên để ghi, phía sau là chuỗi backing index ẩn. Chỉ index mới nhất nhận ghi; rollover tạo index mới; ILM xóa index đủ tuổi.</figcaption></figure>
+
+    <h2>Làm từng bước</h2>
+    <h3>Bước 1 — Chính sách ILM: giữ 7 ngày</h3>
+<pre data-file="ilm.json" data-add="1-8"><code class="language-json">{
+  "policy": {
+    "phases": {
+      "hot":    { "actions": { "rollover": { "max_age": "1d", "max_primary_shard_size": "10gb" } } },
+      "delete": { "min_age": "7d", "actions": { "delete": {} } }
+    }
+  }
+}</code></pre>
+    <p>Pha <code>hot</code> (đang ghi): sang index mới khi index hiện tại đủ 1 ngày hoặc 10GB. Pha <code>delete</code>: index đã rollover được 7 ngày thì xóa. Giữa hai pha có thể thêm <code>warm</code>/<code>cold</code> để dời log cũ sang máy rẻ hơn.</p>
+
+    <h3>Bước 2 — Index template biến tên thành data stream</h3>
+<pre data-file="log_template.json" data-add="3-4,8,12-16"><code class="language-json">{
+  "index_patterns": ["kstore-logs*"],
+  "data_stream": {},
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_replicas": 0,
+      "index.lifecycle.name": "kstore-logs-7-ngay"
+    },
+    "mappings": {
+      "properties": {
+        "@timestamp": { "type": "date" },
+        "level":      { "type": "keyword" },
+        "service":    { "type": "keyword" },
+        "trace_id":   { "type": "keyword" },
+        "message":    { "type": "text" }
+      }
+    }
+  }
+}</code></pre>
+    <ul>
+      <li>Dòng 3: <code>"data_stream": {}</code> — ghi vào tên khớp mẫu sẽ tạo data stream thay vì index thường.</li>
+      <li>Dòng 4: <code>priority</code> cao để không đụng template có sẵn của ES (ES đã có template cho mẫu <code>logs-*-*</code>; mình đặt tên <code>kstore-logs</code> để tránh nó).</li>
+      <li>Dòng 8: gắn chính sách ILM ở bước 1. Dòng 12–16: log dạng JSON có field cố định — <code>level</code>, <code>service</code>, <code>trace_id</code> là <code>keyword</code> để lọc/đếm, chỉ <code>message</code> là <code>text</code>.</li>
+    </ul>
+
+    <h3>Bước 3 — Ghi log, xem data stream, đếm lỗi</h3>
+    <p>File <code>log.ndjson</code> có 8 dòng log trong 50 phút gần nhất, mỗi cặp dòng dạng:</p>
+<pre data-file="log.ndjson (trích)"><code class="language-json">{"create": {}}
+{"@timestamp": "2026-11-15T17:14:11Z", "level": "error", "service": "api-don-hang", "trace_id": "t-101", "message": "Timeout khi gọi cổng thanh toán sau 5000ms"}</code></pre>
+    <div class="term" data-title="zsh"><pre>$ curl -X PUT 'localhost:9200/_ilm/policy/kstore-logs-7-ngay?pretty' -H 'Content-Type: application/json' -d @ilm.json
+{
+  "acknowledged" : true
+}
+
+$ curl -X PUT 'localhost:9200/_index_template/kstore-logs?pretty' -H 'Content-Type: application/json' -d @log_template.json
+{
+  "acknowledged" : true
+}
+
+$ curl -X POST 'localhost:9200/kstore-logs/_bulk?refresh=true&amp;filter_path=errors' -H 'Content-Type: application/x-ndjson' --data-binary @log.ndjson
+{"errors":<span class="ok">false</span>}
+
+$ curl 'localhost:9200/_data_stream/kstore-logs?filter_path=data_streams.name,data_streams.indices.index_name,data_streams.ilm_policy,data_streams.index_mode&amp;pretty'
+{
+  "data_streams" : [
+    {
+      "name" : "kstore-logs",
+      "indices" : [
+        {
+          "index_name" : "<span class="hl">.ds-kstore-logs-2026.11.15-000001</span>"
+        }
+      ],
+      "ilm_policy" : "kstore-logs-7-ngay",
+      "index_mode" : "standard"
+    }
+  ]
+}
+
+$ curl 'localhost:9200/kstore-logs/_search?filter_path=hits.total,aggregations' -H 'Content-Type: application/json' -d '{
+    "size": 0,
+    "query": { "bool": { "filter": [
+      { "term":  { "level": "error" } },
+      { "range": { "@timestamp": { "gte": "now-1h" } } } ] } },
+    "aggs": {
+      "theo_service": { "terms": { "field": "service" } },
+      "theo_15_phut": { "date_histogram": { "field": "@timestamp", "fixed_interval": "15m" } }
+    }
+  }'
+{"hits":{"total":{"value":<span class="hl">4</span>,"relation":"eq"}},"aggregations":{
+  "theo_service":{"doc_count_error_upper_bound":0,"sum_other_doc_count":0,"buckets":[{"key":"<span class="err">api-don-hang</span>","doc_count":<span class="err">3</span>},{"key":"api-tim-kiem","doc_count":1}]},
+  "theo_15_phut":{"buckets":[
+    {"key_as_string":"2026-11-15T17:00:00.000Z","key":1794762000000,"doc_count":1},
+    {"key_as_string":"2026-11-15T17:15:00.000Z","key":1794762900000,"doc_count":0},
+    {"key_as_string":"2026-11-15T17:30:00.000Z","key":1794763800000,"doc_count":2},
+    {"key_as_string":"2026-11-15T17:45:00.000Z","key":1794764700000,"doc_count":1}]}}}</pre></div>
+    <ul>
+      <li>Tên backing index: <code>.ds-</code> + tên data stream + ngày tạo + số thứ tự <code>000001</code>. Dấu chấm đầu = index ẩn; mình không ghi trực tiếp vào nó. <code>index_mode: standard</code> là chế độ lưu thông thường.</li>
+      <li>Truy vấn lỗi giống hệt bài 7–8: <code>filter</code> level + khoảng thời gian <code>now-1h</code>. 4 lỗi trong giờ qua, <code>api-don-hang</code> chiếm 3.</li>
+      <li><code>date_histogram</code> chia theo khung 15 phút (giờ UTC) — bucket 0 lỗi vẫn hiện để biểu đồ liền mạch. Đây chính là cột “số lỗi theo thời gian” trên dashboard Kibana; Kibana chỉ là giao diện sinh ra các truy vấn này.</li>
+    </ul>
+    <p>Muốn thấy rollover ngay thay vì chờ 1 ngày, gọi tay:</p>
+    <div class="term" data-title="zsh"><pre>$ curl -X POST 'localhost:9200/kstore-logs/_rollover?filter_path=old_index,new_index,rolled_over&amp;pretty'
+{
+  "old_index" : ".ds-kstore-logs-2026.11.15-000001",
+  "new_index" : "<span class="ok">.ds-kstore-logs-2026.11.15-000002</span>",
+  "rolled_over" : true
+}
+
+$ curl 'localhost:9200/kstore-logs/_ilm/explain?filter_path=indices.*.phase,indices.*.action&amp;pretty'
+{
+  "indices" : {
+    ".ds-kstore-logs-2026.11.15-000001" : {
+      "phase" : "hot",
+      "action" : "rollover"
+    },
+    ".ds-kstore-logs-2026.11.15-000002" : {
+      "phase" : "new",
+      "action" : "complete"
+    }
+  }
+}</pre></div>
+    <p>Giờ log mới vào <code>000002</code> (write index); tìm trên <code>kstore-logs</code> vẫn đọc cả hai. <code>_ilm/explain</code> cho biết mỗi backing index đang ở pha nào — lệnh đầu tiên cần gọi khi “sao log cũ không bị xóa”. Đây cũng là cơ chế alias nhiều index có <code>is_write_index</code> ở bài 11, ES làm hộ.</p>
+
+    <div class="callout warning" data-title="Mình đã bị dính chỗ này: _bulk với index"><p>Mình quen viết <code>{"index": {}}</code> trong file bulk như bài 3, và gửi vào data stream:</p>
+    <div class="term" data-title="zsh"><pre>$ curl -X POST 'localhost:9200/kstore-logs/_bulk?filter_path=errors,items.*.error.reason' -H 'Content-Type: application/x-ndjson' --data-binary @log_index.ndjson
+{"errors":<span class="err">true</span>,"items":[{"index":{"error":{"reason":"<span class="err">only write ops with an op_type of create are allowed in data streams</span>"}}}]}</pre></div>
+    <p>Data stream chỉ thêm, không ghi đè theo id, nên chỉ chấp nhận <code>create</code>. Và nhớ: <code>_bulk</code> trả HTTP 200 dù từng dòng lỗi — luôn kiểm tra <code>errors</code>. Muốn sửa/xóa log cũ (hiếm) thì dùng <code>_update_by_query</code>/<code>_delete_by_query</code>.</p></div>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Data stream khác index thường ở những điểm nào?</summary><p>Phía sau là chuỗi backing index ẩn do ES quản lý; chỉ nhận ghi create; bắt buộc có @timestamp; ghi luôn vào backing index mới nhất, tìm thì đọc tất cả.</p></details>
+      <details><summary>Muốn giữ log 30 ngày rồi tự xóa, sửa gì?</summary><p>Trong chính sách ILM, đổi min_age của pha delete thành 30d (PUT lại _ilm/policy). Index đang gắn chính sách sẽ dùng bản mới khi bước sang pha tiếp theo.</p></details>
+      <details><summary>Vì sao level, service nên là keyword còn message là text?</summary><p>level, service dùng để lọc và đếm chính xác (term, terms aggregation); message là câu chữ cần tìm theo từ (match).</p></details>
+    </div>
+
+    <h2>Hỏi AI để đi sâu hơn</h2>
+    <ul>
+      <li>“Dựng Elasticsearch + Kibana + Filebeat bằng docker compose để gom log JSON từ các container, kèm dashboard đếm lỗi theo service.”</li>
+      <li>“Viết ingest pipeline Elasticsearch dùng grok và date để tách dòng log dạng text thành level, service, @timestamp.”</li>
+      <li>“Chính sách ILM hot–warm–delete cho log: 3 ngày hot, 30 ngày warm rồi xóa; cách kiểm tra bằng _ilm/explain.”</li>
+    </ul>
+  </section>
+
+  <section class="lesson" id="van-hanh-production" data-part="2 · Nâng cao" data-title="Vận hành production: shard, replica, snapshot và bảo mật" data-minutes="10" data-practice="25" data-updated="2026-11-16" data-done="false" data-summary="Những gì khác giữa laptop và production: shard/replica, sao lưu và khôi phục bằng snapshot, bảo mật bằng API key, và checklist giám sát.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><strong>Replica</strong> chống mất node, <strong>không</strong> chống xóa nhầm — xóa nhầm thì replica xóa theo. Chỉ <strong>snapshot</strong> ra ngoài cluster mới là backup.</li>
+        <li>Snapshot: đăng ký <em>repository</em> (S3, GCS, ổ chung) → <code>PUT _snapshot/&lt;repo&gt;/&lt;tên&gt;</code> → khôi phục bằng <code>_restore</code>, đổi tên khi cần. Đặt lịch bằng <strong>SLM</strong>.</li>
+        <li>Production luôn bật bảo mật; app dùng <strong>API key</strong> quyền tối thiểu, không dùng tài khoản <code>elastic</code>.</li>
+        <li>Số shard chính không đổi được sau khi tạo; số replica đổi lúc nào cũng được.</li>
+      </ul>
+    </div>
+
+    <h2>Vấn đề: laptop khác production ở đâu</h2>
+    <p>Cả khóa học chạy một node, tắt bảo mật, không sao lưu. Trên production, ba câu hỏi phải trả lời được: <em>một máy chết thì sao?</em> (replica), <em>ai đó xóa nhầm thì sao?</em> (snapshot), <em>ai được gọi vào?</em> (bảo mật). Ví von: replica như photo hợp đồng để ở hai phòng — cháy một phòng vẫn còn bản kia; nhưng ai đó sửa nhầm bản gốc thì bản photo tự động sửa theo. Snapshot là bản lưu trong két ở ngân hàng, chụp theo ngày.</p>
+    <figure class="diagram"><svg class="dg" viewBox="0 0 720 240" role="img" aria-label="Cluster 3 node với primary, replica và snapshot"><defs><marker id="es2-h6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="es2-a6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="box" x="10" y="20" width="156" height="140" rx="10"/>
+<text x="88" y="44" class="b" text-anchor="middle">node-1</text>
+<rect class="acc" x="28" y="60" width="120" height="36" rx="6"/>
+<text x="88.0" y="82" class="s m" text-anchor="middle">P0</text>
+<rect class="ok" x="28" y="106" width="120" height="36" rx="6"/>
+<text x="88.0" y="128" class="s m" text-anchor="middle">R1</text>
+<rect class="box" x="180" y="20" width="156" height="140" rx="10"/>
+<text x="258" y="44" class="b" text-anchor="middle">node-2</text>
+<rect class="acc" x="198" y="60" width="120" height="36" rx="6"/>
+<text x="258.0" y="82" class="s m" text-anchor="middle">P1</text>
+<rect class="ok" x="198" y="106" width="120" height="36" rx="6"/>
+<text x="258.0" y="128" class="s m" text-anchor="middle">R2</text>
+<rect class="box" x="350" y="20" width="156" height="140" rx="10"/>
+<text x="428" y="44" class="b" text-anchor="middle">node-3</text>
+<rect class="acc" x="368" y="60" width="120" height="36" rx="6"/>
+<text x="428.0" y="82" class="s m" text-anchor="middle">P2</text>
+<rect class="ok" x="368" y="106" width="120" height="36" rx="6"/>
+<text x="428.0" y="128" class="s m" text-anchor="middle">R0</text>
+<text x="10" y="186" class="s">P = primary shard · R = replica (bản sao của P cùng số, luôn ở node khác)</text>
+<rect class="warn" x="560" y="50" width="150" height="80" rx="8"/>
+<text x="635.0" y="78" class="b" text-anchor="middle">snapshot repo</text>
+<text x="635.0" y="94" class="s" text-anchor="middle">S3 · GCS · ổ chung</text>
+<text x="635.0" y="112" class="s" text-anchor="middle">ngoài cluster</text>
+<path class="ln dash" d="M520,90 H556" marker-end="url(#es2-h6)"/>
+<text x="538" y="80" class="s m" text-anchor="middle">_snapshot</text>
+<text x="10" y="222" class="s a">Mất node-2: P1 mất → R1 ở node-1 được nâng lên primary, cluster vàng rồi xanh lại.</text>
+</svg><figcaption>Replica nằm ở node khác primary: mất một node vẫn còn dữ liệu. Nhưng xóa nhầm thì replica xóa theo — chỉ snapshot ra ngoài cluster mới cứu được.</figcaption></figure>
+    <table>
+      <thead><tr><th>Chủ đề</th><th>Điều cần biết</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Shard</strong></td><td>Mỗi shard nên khoảng 10–50GB; đừng tạo hàng trăm shard tí hon. Đổi số shard = reindex (bài 11) hoặc <code>_split</code>/<code>_shrink</code>.</td></tr>
+        <tr><td><strong>Replica</strong></td><td>Tối thiểu 1 replica, 3 node. Trên một node, đặt <code>number_of_replicas: 1</code> là cluster vàng: <code>_cluster/allocation/explain</code> trả lời thẳng “a copy of this shard is already allocated to this node”.</td></tr>
+        <tr><td><strong>Bộ nhớ</strong></td><td>Heap Java khoảng một nửa RAM (tối đa ~31GB); nửa còn lại để hệ điều hành cache file cho Lucene.</td></tr>
+        <tr><td><strong>Giám sát</strong></td><td><code>_cluster/health</code>, <code>_cat/nodes</code>, <code>_cat/allocation</code> (dung lượng ổ — ES ngừng ghi khi ổ gần đầy), độ trễ tìm kiếm; Stack Monitoring trong Kibana.</td></tr>
+        <tr><td><strong>Hosting</strong></td><td>Tự vận hành (VM, Kubernetes với ECK operator) hoặc managed: Elastic Cloud, Amazon OpenSearch Service.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Làm từng bước: sao lưu, xóa nhầm, khôi phục</h2>
+    <h3>Bước 1 — Khai báo thư mục snapshot khi chạy ES</h3>
+    <p>Repository kiểu <code>fs</code> chỉ dùng được thư mục khai báo trong <code>path.repo</code>, và setting này phải có <strong>lúc khởi động</strong> — không thêm vào container đang chạy được. Tạo lại container học với một dòng mới (dữ liệu cũ mất, nạp lại theo bài 5 và 11–12):</p>
+<pre data-file="chạy lại es-lab" data-add="5"><code class="language-bash">docker run -d --name es-lab -p 9200:9200 \
+  -e discovery.type=single-node \
+  -e xpack.security.enabled=false \
+  -e ES_JAVA_OPTS="-Xms1g -Xmx1g" \
+  -e path.repo=/tmp/snap \
+  docker.elastic.co/elasticsearch/elasticsearch:9.5.5</code></pre>
+    <p>Production thì repository thường là S3/GCS (kiểu <code>s3</code>, <code>gcs</code>), cấu hình tương tự nhưng thêm bucket và khóa truy cập; không chạy ở đây.</p>
+
+    <h3>Bước 2 — Đăng ký repository và chụp snapshot</h3>
+    <div class="term" data-title="zsh"><pre>$ curl -X PUT 'localhost:9200/_snapshot/sao_luu?pretty' -H 'Content-Type: application/json' -d '{
+    "type": "fs", "settings": { "location": "/tmp/snap/kstore" }
+  }'
+{
+  "acknowledged" : true
+}
+
+$ curl -X PUT 'localhost:9200/_snapshot/sao_luu/snap-2026.11.16?wait_for_completion=true&amp;filter_path=snapshot.snapshot,snapshot.indices,snapshot.state,snapshot.shards&amp;pretty' -H 'Content-Type: application/json' -d '{
+    "indices": "san_pham_v3", "include_global_state": false
+  }'
+{
+  "snapshot" : {
+    "snapshot" : "snap-2026.11.16",
+    "indices" : [
+      "san_pham_v3"
+    ],
+    "state" : "<span class="ok">SUCCESS</span>",
+    "shards" : {
+      "total" : 1,
+      "failed" : 0,
+      "successful" : 1
+    }
+  }
+}</pre></div>
+    <ul>
+      <li><code>wait_for_completion=true</code> để curl chờ xong (index lớn thì bỏ, theo dõi bằng <code>_snapshot/sao_luu/_current</code>).</li>
+      <li><code>indices</code>: chỉ chụp index thật <code>san_pham_v3</code>; <code>include_global_state: false</code> bỏ qua template, cấu hình cluster.</li>
+      <li>Snapshot là <strong>tăng dần</strong>: lần sau chỉ chép các segment mới, nên chụp mỗi đêm vẫn nhẹ.</li>
+    </ul>
+
+    <h3>Bước 3 — “Xóa nhầm” rồi khôi phục sang tên khác</h3>
+    <div class="term" data-title="zsh"><pre>$ curl -X DELETE 'localhost:9200/san_pham_live/_doc/SP012?refresh=true&amp;filter_path=result'
+{"result":"<span class="err">deleted</span>"}
+$ curl 'localhost:9200/san_pham_live/_count?filter_path=count'
+{"count":11}
+
+$ curl -X POST 'localhost:9200/_snapshot/sao_luu/snap-2026.11.16/_restore?wait_for_completion=true&amp;filter_path=snapshot.indices,snapshot.shards&amp;pretty' -H 'Content-Type: application/json' -d '{
+    "indices": "san_pham_v3",
+    "rename_pattern": "(.+)", "rename_replacement": "khoi_phuc_$1"
+  }'
+{
+  "snapshot" : {
+    "indices" : [
+      "<span class="ok">khoi_phuc_san_pham_v3</span>"
+    ],
+    "shards" : {
+      "total" : 1,
+      "failed" : 0,
+      "successful" : 1
+    }
+  }
+}
+
+$ curl 'localhost:9200/_cat/indices/*san_pham_v3?v&amp;h=index,health,docs.count'
+index                 health docs.count
+khoi_phuc_san_pham_v3 green          <span class="ok">12</span>
+san_pham_v3           green          11
+
+$ curl -X POST 'localhost:9200/_reindex?refresh=true&amp;filter_path=created,version_conflicts' -H 'Content-Type: application/json' -d '{
+    "conflicts": "proceed",
+    "source": { "index": "khoi_phuc_san_pham_v3", "query": { "ids": { "values": ["SP012"] } } },
+    "dest":   { "index": "san_pham_v3", "op_type": "create" }
+  }'
+{"created":<span class="ok">1</span>,"version_conflicts":0}
+
+$ curl 'localhost:9200/san_pham_live/_count?filter_path=count'
+{"count":<span class="err">24</span>}</pre></div>
+    <ul>
+      <li>Không khôi phục đè lên <code>san_pham_v3</code> đang chạy (sẽ mất mọi thay đổi sau giờ chụp). <code>rename_pattern</code>/<code>rename_replacement</code> khôi phục sang <code>khoi_phuc_san_pham_v3</code> (12 tài liệu, còn SP012) để nhặt lại đúng thứ cần.</li>
+      <li>Nhặt SP012 bằng <code>_reindex</code> có <code>query ids</code> + <code>op_type: create</code> (bài 11): <code>created: 1</code>.</li>
+      <li>Nhưng đếm qua alias ra <strong>24</strong>, không phải 12…</li>
+    </ul>
+
+    <div class="callout warning" data-title="Mình đã bị dính chỗ này: restore mang theo alias"><div class="term" data-title="zsh"><pre>$ curl 'localhost:9200/_cat/aliases/san_pham_live?v&amp;h=alias,index'
+alias         index
+san_pham_live <span class="err">khoi_phuc_san_pham_v3</span>
+san_pham_live san_pham_v3</pre></div>
+    <p>Snapshot lưu cả alias của index, và <code>_restore</code> mặc định gắn lại alias — nên <code>san_pham_live</code> giờ trỏ hai index, khách thấy mỗi sản phẩm hai lần (đúng cái bẫy “alias trỏ hai index” của bài 11). Sửa: xóa index khôi phục, restore lại với <code>"include_aliases": false</code>:</p>
+    <div class="term" data-title="zsh"><pre>$ curl -X DELETE 'localhost:9200/khoi_phuc_san_pham_v3'
+{"acknowledged":true}
+$ curl -X POST 'localhost:9200/_snapshot/sao_luu/snap-2026.11.16/_restore?wait_for_completion=true&amp;filter_path=snapshot.indices,snapshot.shards.successful' -H 'Content-Type: application/json' -d '{
+    "indices": "san_pham_v3", <span class="hl">"include_aliases": false</span>,
+    "rename_pattern": "(.+)", "rename_replacement": "khoi_phuc_$1"
+  }'
+{"snapshot":{"indices":["khoi_phuc_san_pham_v3"],"shards":{"successful":1}}}
+$ curl 'localhost:9200/san_pham_live/_count?filter_path=count'
+{"count":<span class="ok">12</span>}</pre></div>
+    <p>Khôi phục để điều tra/nhặt dữ liệu thì luôn kèm <code>include_aliases: false</code>, rồi kiểm tra <code>_cat/aliases</code>.</p></div>
+
+    <h2>Bảo mật: API key cho app</h2>
+    <p>Bật bảo mật cần chứng chỉ TLS và mật khẩu, nên container học vẫn tắt; mẫu dưới <strong>không chạy ở đây</strong>. Ý chính: tạo một API key chỉ đọc alias <code>san_pham_live</code>, app đọc key từ biến môi trường:</p>
+<pre data-file="mẫu — chưa chạy" data-add="3-6"><code class="language-text">POST _security/api_key
+{
+  "name": "api-tim-kiem",
+  "role_descriptors": {
+    "chi_doc_san_pham": { "indices": [ { "names": ["san_pham_live"], "privileges": ["read"] } ] }
+  }
+}</code></pre>
+    <p>Phía Python: <code>Elasticsearch("https://es.noi-bo:9200", api_key=os.environ["ES_API_KEY"])</code>. Không bao giờ mở cổng 9200 ra Internet.</p>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Cluster có 1 replica cho mọi index. Có cần snapshot nữa không?</summary><p>Có. Replica chỉ chống mất node; xóa nhầm, ghi sai dữ liệu thì replica sao chép luôn cái sai. Snapshot ra ngoài cluster mới khôi phục được về thời điểm trước.</p></details>
+      <details><summary>Vì sao khôi phục sang tên khác thay vì đè lên index đang chạy?</summary><p>Đè lên thì mất mọi thay đổi sau giờ chụp; khôi phục sang tên khác (rename_pattern) để nhặt lại đúng tài liệu cần, kèm include_aliases: false để không làm alias trỏ hai index.</p></details>
+      <details><summary>Đặt number_of_replicas: 1 trên cluster một node thì sao?</summary><p>Cluster vàng: replica không được đặt cùng node với primary nên nằm UNASSIGNED; _cluster/allocation/explain giải thích lý do.</p></details>
+    </div>
+
+    <h2>Hỏi AI để đi sâu hơn</h2>
+    <ul>
+      <li>“Cấu hình snapshot lifecycle policy (SLM) sao lưu hằng đêm lên S3, giữ 14 bản; cách thử khôi phục định kỳ.”</li>
+      <li>“Cluster Elasticsearch báo red: quy trình chẩn đoán bằng _cluster/health, _cat/shards và _cluster/allocation/explain.”</li>
+      <li>“Chọn số shard và số node cho index 200GB tăng 5GB mỗi ngày, có 3 replica đọc nhiều.”</li>
+    </ul>
+  </section>
+
+</main>
+</body>
+</html>

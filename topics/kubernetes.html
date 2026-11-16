@@ -7,11 +7,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="../assets/style.css?v=20261115-6">
-<script src="../assets/common.js?v=20261115-6"></script>
-<script src="../assets/data.js?v=20261115-6"></script>
+<link rel="stylesheet" href="../assets/style.css?v=20261116-6">
+<script src="../assets/common.js?v=20261116-6"></script>
+<script src="../assets/data.js?v=20261116-6"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-<script src="../assets/topic.js?v=20261115-6"></script>
+<script src="../assets/topic.js?v=20261116-6"></script>
 </head>
 <body data-topic="kubernetes">
 <main id="lessons">
@@ -225,12 +225,12 @@ spec:
       <thead><tr><th>Phần</th><th>Đọc</th><th>Thực hành</th><th>Tổng</th></tr></thead>
       <tbody>
         <tr><td>Phần 1 · Cốt lõi (9 bài)</td><td>≈ 3 giờ</td><td>≈ 5,5 giờ</td><td><strong>≈ 8,5 giờ</strong></td></tr>
-        <tr><td>Phần 2 · Tra cứu (6 bài, đọc lướt)</td><td>≈ 0,5 giờ</td><td>khi cần</td><td>≈ 0,5 giờ</td></tr>
+        <tr><td>Phần 2 · Nâng cao (6 bài)</td><td>≈ 1,2 giờ</td><td>≈ 3,3 giờ</td><td>≈ 4,5 giờ</td></tr>
         <tr><td>Ôn lại, làm lại bài 9 không nhìn hướng dẫn</td><td></td><td>≈ 1 giờ</td><td>≈ 1 giờ</td></tr>
-        <tr><td colspan="3"><strong>Tổng</strong></td><td><strong>≈ 10 giờ</strong></td></tr>
+        <tr><td colspan="3"><strong>Tổng</strong></td><td><strong>≈ 14 giờ</strong></td></tr>
       </tbody>
     </table>
-    <p>Với mục tiêu <strong>2 giờ mỗi ngày</strong>, lộ trình gợi ý là <strong>5 buổi</strong>:</p>
+    <p>Với mục tiêu <strong>2 giờ mỗi ngày</strong>, lộ trình gợi ý là <strong>7 buổi</strong> (5 buổi Phần 1, 2 buổi Phần 2):</p>
     <table>
       <thead><tr><th>Buổi</th><th>Bài</th><th>Xong buổi này thì…</th></tr></thead>
       <tbody>
@@ -238,7 +238,9 @@ spec:
         <tr><td>2</td><td>4. Deployment · 5. Service</td><td>App tự phục hồi, cập nhật không downtime, gọi được bằng tên.</td></tr>
         <tr><td>3</td><td>6. ConfigMap/Secret · 7. Ingress</td><td>App đọc cấu hình, mở ra ngoài theo domain.</td></tr>
         <tr><td>4</td><td>8. Debug · bắt đầu 9</td><td>Tự đọc lỗi và sửa được các sự cố hay gặp.</td></tr>
-        <tr><td>5</td><td>Xong 9 · lướt Phần 2 · ôn</td><td>Tự viết cấu hình cho một app mới từ số 0.</td></tr>
+        <tr><td>5</td><td>Xong 9 · ôn Phần 1</td><td>Tự viết cấu hình cho một app mới từ số 0.</td></tr>
+        <tr><td>6</td><td>Phần 2: 10. Lưu dữ liệu · 11. Job/CronJob · 12. Autoscaling</td><td>Chạy database có ổ đĩa bền, tác vụ theo lịch, app tự tăng giảm số Pod.</td></tr>
+        <tr><td>7</td><td>Phần 2: 13. Kustomize/Helm/GitOps · 14. Bảo mật · 15. Monitoring</td><td>Triển khai nhiều môi trường, siết quyền, có dashboard và log tập trung.</td></tr>
       </tbody>
     </table>
     <div class="callout tip"><p>Con số là cho người đã quen Docker và terminal. Lần đầu gặp YAML thì cộng thêm khoảng 30%. Cứ chậm mà chắc — mỗi buổi chỉ đi tiếp khi lệnh đã chạy ra đúng như bài.</p></div>
@@ -1885,199 +1887,848 @@ spec:
     <h2>Dọn dẹp</h2>
     <div class="term" data-title="zsh — kind-lab"><pre>$ kubectl delete namespace shop
 namespace "shop" deleted</pre></div>
-    <div class="callout tip" data-title="Xong Phần 1"><p>Tới đây mình đọc hiểu và tự viết được cấu hình cho phần lớn app web trên Kubernetes. Phần 2 dành cho lúc gặp việc cụ thể: lưu dữ liệu, chạy job theo lịch, autoscale, Helm, GitOps, bảo mật, monitoring — đọc khi cần, mỗi bài có sẵn câu hỏi để hỏi AI.</p></div>
+    <div class="callout tip" data-title="Xong Phần 1"><p>Tới đây mình đọc hiểu và tự viết được cấu hình cho phần lớn app web trên Kubernetes. Phần 2 đi tiếp các chủ đề nâng cao gặp khi vận hành thật: lưu dữ liệu, chạy job theo lịch, autoscale, Kustomize/Helm/GitOps, bảo mật, monitoring — mỗi bài khoảng 10 phút đọc, cuối bài có câu hỏi để hỏi AI khi muốn đi sâu hơn.</p></div>
   </section>
 
-  <!-- ===================== PHẦN 2 · TRA CỨU KHI CẦN ===================== -->
-  <!-- Mỗi bài: Dùng khi · Ý chính · Mẫu tối thiểu · Hỏi AI. Không cần học thuộc. -->
+  <!-- ===================== PHẦN 2 · NÂNG CAO ===================== -->
 
-  <section class="lesson" id="luu-du-lieu" data-part="2 · Tra cứu khi cần" data-title="Lưu dữ liệu: PVC và StatefulSet" data-minutes="5" data-updated="2026-11-15" data-done="false" data-summary="Khi app cần ổ đĩa sống lâu hơn Pod.">
-    <div class="callout note" data-title="Dùng khi"><p>App ghi dữ liệu cần giữ lại sau khi Pod chết: database, file upload. App stateless (API, web) thì không cần bài này.</p></div>
-
-    <h2>Ý chính</h2>
-    <ul>
-      <li>App xin ổ đĩa bằng <strong>PersistentVolumeClaim (PVC)</strong> — “cần 5Gi”. Cluster tự cấp ổ thật (PV) theo <strong>StorageClass</strong>.</li>
-      <li>Ổ phổ biến là <code>ReadWriteOnce</code>: chỉ gắn vào một node một lúc.</li>
-      <li>Nhiều bản cần ổ riêng từng bản (cluster DB, Kafka) → <strong>StatefulSet</strong>: Pod có tên cố định <code>db-0</code>, <code>db-1</code> và PVC riêng.</li>
-      <li>Database production thường dùng dịch vụ managed của cloud hoặc Operator, không tự viết StatefulSet.</li>
-    </ul>
-
-    <h2>Mẫu tối thiểu</h2>
-<pre><code class="language-yaml">apiVersion: v1
-kind: PersistentVolumeClaim
-metadata: { name: data }
-spec:
-  accessModes: ["ReadWriteOnce"]
-  resources: { requests: { storage: 2Gi } }
----
-# trong Deployment/StatefulSet:
-#   containers[].volumeMounts: [{ name: data, mountPath: /var/lib/data }]
-#   volumes: [{ name: data, persistentVolumeClaim: { claimName: data } }]</code></pre>
-    <div class="callout warning"><p>Nhiều StorageClass có <code>reclaimPolicy: Delete</code>: xóa PVC là mất dữ liệu. Luôn có backup riêng.</p></div>
-
-    <h2>Hỏi AI</h2>
-    <ul>
-      <li>“Viết StatefulSet PostgreSQL 1 replica có PVC 10Gi, mật khẩu lấy từ Secret.”</li>
-      <li>“Khác nhau giữa ReadWriteOnce và ReadWriteMany, storage nào trên AWS hỗ trợ RWX?”</li>
-    </ul>
-  </section>
-
-  <section class="lesson" id="job-cronjob" data-part="2 · Tra cứu khi cần" data-title="Job, CronJob và DaemonSet" data-minutes="4" data-updated="2026-11-15" data-done="false" data-summary="Tác vụ chạy một lần, chạy theo lịch, hoặc chạy trên mọi node.">
-    <div class="callout note" data-title="Dùng khi">
+  <section class="lesson" id="luu-du-lieu" data-part="2 · Nâng cao" data-title="Lưu dữ liệu: PVC và StatefulSet" data-minutes="12" data-practice="30" data-updated="2026-11-16" data-done="false" data-summary="Vì sao dữ liệu trong container biến mất, xin ổ đĩa bằng PVC, và chạy PostgreSQL bằng StatefulSet.">
+    <div class="callout note" data-title="Cần nhớ">
       <ul>
-        <li><strong>Job</strong> — chạy một lần tới khi xong: migration DB, xử lý dữ liệu.</li>
-        <li><strong>CronJob</strong> — Job theo lịch: backup hằng đêm, gửi báo cáo.</li>
-        <li><strong>DaemonSet</strong> — một Pod trên mỗi node: agent log, agent monitoring.</li>
+        <li>Filesystem của container mất khi Pod bị thay. Dữ liệu cần giữ phải nằm trên một <strong>volume</strong> sống lâu hơn Pod.</li>
+        <li>App xin ổ bằng <strong>PersistentVolumeClaim (PVC)</strong>; <strong>StorageClass</strong> tự tạo ổ thật (<strong>PersistentVolume</strong>, PV).</li>
+        <li>Database cần ổ riêng và tên cố định cho từng bản → <strong>StatefulSet</strong>: <code>postgres-0</code> luôn gắn ổ <code>data-postgres-0</code>.</li>
       </ul>
     </div>
 
-    <h2>Mẫu tối thiểu: CronJob</h2>
-<pre><code class="language-yaml">apiVersion: batch/v1
-kind: CronJob
-metadata: { name: nightly-backup }
+    <h2>Vấn đề và ví von</h2>
+    <p>File ghi trong container mất khi Pod bị thay: container nào cũng khởi động từ <strong>bản sạch của image</strong>. Shop cần một database PostgreSQL — dữ liệu phải sống qua mọi lần thay Pod.</p>
+    <p>Ví von: Pod như <strong>phòng khách sạn</strong>. Muốn giữ đồ, mình điền <strong>phiếu thuê tủ</strong> (PVC); dịch vụ cho thuê (StorageClass) đóng <strong>cái tủ thật</strong> (PV). Đổi phòng, cầm đúng phiếu là mở được tủ cũ.</p>
+    <figure class="diagram">
+      <svg class="dg" viewBox="0 0 720 248" role="img" aria-label="Chuỗi Pod, PVC, PV và StorageClass"><defs><marker id="k82-h1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="k82-a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<text x="106" y="22" class="s" text-anchor="middle">StatefulSet tạo</text>
+<text x="360" y="22" class="s" text-anchor="middle">StatefulSet tạo từ khuôn</text>
+<text x="614" y="22" class="s" text-anchor="middle">cluster tự tạo</text>
+<rect class="acc" x="16" y="34" width="180" height="84" rx="8"/>
+<text x="106" y="58" class="b" text-anchor="middle">Pod postgres-0</text>
+<text x="106" y="80" class="s" text-anchor="middle">tên cố định</text>
+<text x="106" y="100" class="s m" text-anchor="middle">/var/lib/postgresql</text>
+<rect class="box" x="270" y="34" width="180" height="84" rx="8"/>
+<text x="360" y="58" class="b" text-anchor="middle">PVC data-postgres-0</text>
+<text x="360" y="80" class="s" text-anchor="middle">“phiếu thuê”: cần 1Gi</text>
+<text x="360" y="100" class="s m" text-anchor="middle">ReadWriteOnce</text>
+<rect class="ok" x="524" y="34" width="180" height="84" rx="8"/>
+<text x="614" y="58" class="b" text-anchor="middle">PV pvc-8e1d4b27…</text>
+<text x="614" y="80" class="s" text-anchor="middle">“cái tủ thật”, Bound</text>
+<text x="614" y="100" class="s m" text-anchor="middle">reclaimPolicy: Delete</text>
+<path class="ln-a" d="M196,76 H266" marker-end="url(#k82-a1)"/>
+<text x="233" y="68" class="s a" text-anchor="middle">dùng</text>
+<path class="ln-a" d="M450,76 H520" marker-end="url(#k82-a1)"/>
+<text x="487" y="68" class="s a" text-anchor="middle">gắn với</text>
+<rect class="box" x="524" y="164" width="180" height="72" rx="8"/>
+<text x="614" y="186" class="b" text-anchor="middle">StorageClass</text>
+<text x="614" y="206" class="s m" text-anchor="middle">standard (default)</text>
+<text x="614" y="224" class="s m" text-anchor="middle">rancher.io/local-path</text>
+<path class="ln dash" d="M614,164 V122" marker-end="url(#k82-h1)"/>
+<text x="604" y="148" class="s" text-anchor="end">thấy PVC mới → tạo PV</text>
+<rect class="zone" x="16" y="164" width="434" height="72" rx="8"/>
+<text x="32" y="186" class="b">PV thực chất nằm ở đâu?</text>
+<text x="32" y="206" class="s">kind: một thư mục trên node (local-path)</text>
+<text x="32" y="224" class="s">cloud: ổ EBS (AWS), Persistent Disk (GCP)…</text>
+      </svg>
+      <figcaption>Mình chỉ mô tả “cần ổ gì”. PV được StorageClass tạo tự động — gọi là <em>dynamic provisioning</em>.</figcaption>
+    </figure>
+
+    <h2>Làm từng bước: PostgreSQL bằng StatefulSet</h2>
+    <p>Bài 9 kết thúc bằng xóa namespace <code>shop</code>, nên dựng lại trước (cả Phần 2 dùng namespace này):</p>
+    <div class="term" data-title="zsh — kind-lab"><pre>$ kubectl create namespace shop
+namespace/shop created
+
+$ kubectl config set-context --current --namespace=shop
+Context "kind-lab" modified.
+
+$ kubectl create secret generic shop-api-secret --from-literal=DB_PASSWORD='doi-mat-khau-nay'
+secret/shop-api-secret created
+
+$ kubectl apply -f shop-api.yaml
+configmap/shop-api-config created
+deployment.apps/shop-api created
+service/shop-api created
+ingress.networking.k8s.io/shop-api created</pre></div>
+
+    <h3>Bước 1 — Headless Service và khung StatefulSet</h3>
+<pre data-file="postgres.yaml" data-add="1-39"><code class="language-yaml">apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
 spec:
-  schedule: "0 2 * * *"            # 02:00 mỗi ngày (cú pháp cron)
+  clusterIP: None
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17
+          env:
+            - name: POSTGRES_USER
+              value: shop
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: shop-api-secret
+                  key: DB_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata</code></pre>
+    <ul>
+      <li><code>clusterIP: None</code> — <strong>headless Service</strong>: mỗi Pod có tên DNS riêng (<code>postgres-0.postgres</code>). <code>serviceName</code> trỏ tới nó.</li>
+      <li>Phần còn lại giống Deployment; mật khẩu lấy từ Secret bằng <code>valueFrom</code> (bài 6).</li>
+      <li><code>PGDATA</code> trỏ vào thư mục <em>con</em>: ổ cloud mới có sẵn <code>lost+found</code>, Postgres sẽ từ chối khởi tạo.</li>
+    </ul>
+
+    <h3>Bước 2 — Khuôn ổ đĩa</h3>
+<pre data-file="postgres.yaml (phần template trở xuống)" data-add="8-18"><code class="language-yaml">  template:
+    # ... metadata, labels giữ nguyên
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17
+          # ... env giữ nguyên
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi</code></pre>
+    <p><code>volumeClaimTemplates</code> là <strong>khuôn PVC</strong>: mỗi Pod có PVC riêng tên <code>&lt;khuôn&gt;-&lt;StatefulSet&gt;-&lt;số&gt;</code>. <code>ReadWriteOnce</code> = gắn đọc-ghi vào <strong>một node</strong> tại một lúc.</p>
+
+    <h3>Bước 3 — Apply, ghi dữ liệu, xóa Pod</h3>
+    <div class="term" data-title="zsh — kind-lab / shop"><pre>$ kubectl apply -f postgres.yaml
+service/postgres created
+statefulset.apps/postgres created
+
+$ kubectl get pods,pvc -l app=postgres
+NAME             READY   STATUS    RESTARTS   AGE
+pod/<span class="hl">postgres-0</span>   1/1     Running   0          40s
+
+NAME                                    STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+persistentvolumeclaim/<span class="hl">data-postgres-0</span>   Bound    pvc-8e1d4b27-93c5-4f0a-b6e2-5a7c9d3f1e08   1Gi        RWO            standard       &lt;unset&gt;                 40s
+
+$ kubectl exec postgres-0 -- psql -U shop -c "CREATE TABLE orders (id int PRIMARY KEY, item text); INSERT INTO orders VALUES (1001, 'ao thun');"
+INSERT 0 1
+
+$ kubectl delete pod postgres-0
+pod "postgres-0" deleted
+
+$ kubectl exec postgres-0 -- psql -U shop -c "SELECT * FROM orders;"
+  id  |  item
+------+---------
+ 1001 | <span class="ok">ao thun</span>
+(1 row)</pre></div>
+    <ul>
+      <li>Pod tên <code>postgres-0</code>, không chuỗi ngẫu nhiên. Xóa đi, Pod mới mang <strong>đúng tên cũ</strong>, gắn lại đúng PVC nên bảng <code>orders</code> còn nguyên.</li>
+      <li>PVC <code>Pending</code> với Event <code>WaitForFirstConsumer</code> không phải lỗi: kind chờ có Pod dùng rồi mới tạo ổ.</li>
+    </ul>
+
+    <div class="callout warning" data-title="Mình đã bị dính chỗ này"><p>Mình scale <code>postgres</code> lên 2 và tưởng có database dự phòng. Sai: <code>postgres-1</code> là database <strong>rỗng</strong>, ổ riêng. StatefulSet chỉ lo <em>tên và ổ</em>; replication là việc của database — thường giao cho dịch vụ managed (RDS) hoặc một <strong>Operator</strong> như CloudNativePG.</p></div>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Ba khác biệt giữa StatefulSet và Deployment?</summary><p>Tên Pod cố định theo số thứ tự; mỗi Pod một PVC riêng từ khuôn; tạo/xóa tuần tự.</p></details>
+      <details><summary>Xóa StatefulSet postgres thì PVC data-postgres-0 có bị xóa không?</summary><p>Không, PVC được giữ lại; apply lại là postgres-0 gắn lại ổ cũ. Xóa PVC bằng tay mới mất dữ liệu.</p></details>
+      <details><summary>PV và PVC, cái nào có namespace, cái nào mình viết?</summary><p>PVC có namespace, do mình viết (hoặc StatefulSet sinh). PV thuộc cả cluster, do StorageClass tạo.</p></details>
+    </div>
+
+    <h2>Hỏi AI để đi sâu hơn</h2>
+    <ul>
+      <li>“Chuyện gì xảy ra từ lúc apply PVC tới khi ổ EBS được gắn vào node trên EKS (CSI driver, attach, mount)?”</li>
+      <li>“So sánh PostgreSQL bằng StatefulSet tự viết, CloudNativePG và RDS: backup, failover, chi phí.”</li>
+      <li>“ReadWriteOnce, ReadWriteOncePod, ReadWriteMany khác nhau thế nào? Lỗi Multi-Attach là gì?”</li>
+    </ul>
+  </section>
+
+  <section class="lesson" id="job-cronjob" data-part="2 · Nâng cao" data-title="Job, CronJob và DaemonSet" data-minutes="12" data-practice="25" data-updated="2026-11-16" data-done="false" data-summary="Tác vụ chạy xong rồi dừng, chạy theo lịch, hoặc chạy một bản trên mỗi node.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><strong>Job</strong> chạy Pod tới khi xong rồi dừng: migration, xử lý dữ liệu. <strong>CronJob</strong> tạo Job theo lịch.</li>
+        <li>Pod của Job dùng <code>restartPolicy: Never</code> hoặc <code>OnFailure</code>; <code>backoffLimit</code> giới hạn số lần thử lại.</li>
+        <li>CronJob tính giờ theo <strong>UTC</strong> nếu không đặt <code>timeZone</code>.</li>
+        <li><strong>DaemonSet</strong> chạy đúng một Pod trên mỗi node: agent thu log, agent monitoring.</li>
+      </ul>
+    </div>
+
+    <h2>Vấn đề và ví von</h2>
+    <p>Mỗi sáng shop cần đếm số đơn hàng. Viết thành Deployment thì sai: Deployment luôn muốn Pod <em>đang chạy</em>, nên lệnh chạy xong (exit 0) vẫn bị khởi động lại mãi, rồi rơi vào <code>CrashLoopBackOff</code>. Mình cần thứ hiểu khái niệm “xong”.</p>
+    <p>Ví von: Deployment là <strong>nhân viên trực ca</strong> cả ngày; Job là <strong>thợ được gọi tới</strong>, làm xong thì về; CronJob là <strong>lịch gọi thợ</strong> định kỳ; DaemonSet là <strong>mỗi tầng một bảo vệ</strong>.</p>
+    <figure class="diagram">
+      <svg class="dg" viewBox="0 0 720 200" role="img" aria-label="CronJob tạo Job, Job tạo Pod chạy tới khi xong; DaemonSet một Pod mỗi node"><defs><marker id="k82-h3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="k82-a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="acc" x="16" y="24" width="150" height="58" rx="8"/>
+<text x="91" y="48" class="b" text-anchor="middle">CronJob</text>
+<text x="91" y="68" class="s m" text-anchor="middle">"0 8 * * *"</text>
+<rect class="box" x="210" y="24" width="150" height="58" rx="8"/>
+<text x="285" y="48" class="b" text-anchor="middle">Job</text>
+<text x="285" y="68" class="s" text-anchor="middle">mỗi 8:00 một Job</text>
+<rect class="ok" x="404" y="24" width="150" height="58" rx="8"/>
+<text x="479" y="48" class="b" text-anchor="middle">Pod</text>
+<text x="479" y="68" class="s" text-anchor="middle">chạy → Completed</text>
+<path class="ln-a" d="M166,53 H206" marker-end="url(#k82-a3)"/>
+<path class="ln-a" d="M360,53 H400" marker-end="url(#k82-a3)"/>
+<text x="572" y="48" class="s">thất bại: thử lại</text>
+<text x="572" y="66" class="s">tối đa backoffLimit</text>
+<rect class="acc" x="16" y="122" width="150" height="58" rx="8"/>
+<text x="91" y="146" class="b" text-anchor="middle">DaemonSet</text>
+<text x="91" y="166" class="s" text-anchor="middle">vd: kube-proxy</text>
+<rect class="zone" x="210" y="122" width="150" height="58" rx="8"/>
+<text x="285" y="146" class="b" text-anchor="middle">node 1</text>
+<text x="285" y="166" class="s" text-anchor="middle">1 Pod</text>
+<rect class="zone" x="380" y="122" width="150" height="58" rx="8"/>
+<text x="455" y="146" class="b" text-anchor="middle">node 2</text>
+<text x="455" y="166" class="s" text-anchor="middle">1 Pod</text>
+<rect class="zone" x="550" y="122" width="150" height="58" rx="8"/>
+<text x="625" y="146" class="b" text-anchor="middle">node 3</text>
+<text x="625" y="166" class="s" text-anchor="middle">1 Pod</text>
+<path class="ln dash" d="M166,151 H206" marker-end="url(#k82-h3)"/>
+      </svg>
+      <figcaption>Trên: Job chạy tới khi xong. Dưới: DaemonSet thêm node là tự thêm Pod, không có <code>replicas</code>.</figcaption>
+    </figure>
+
+    <h2>Làm từng bước: CronJob đếm đơn hàng</h2>
+    <p>Dùng database <code>postgres</code> từ bài trước. Image <code>postgres:17</code> có sẵn <code>psql</code>.</p>
+    <h3>Bước 1 — Lịch chạy</h3>
+<pre data-file="shop-report.yaml" data-add="1-7"><code class="language-yaml">apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: shop-report
+spec:
+  schedule: "0 8 * * *"
+  timeZone: "Asia/Ho_Chi_Minh"</code></pre>
+    <p>Cú pháp cron 5 ô: <em>phút giờ ngày tháng thứ</em> → “8:00 mỗi ngày”. <code>timeZone</code> nói 8 giờ theo giờ Việt Nam.</p>
+
+    <h3>Bước 2 — Khuôn Job</h3>
+<pre data-file="shop-report.yaml" data-add="8-23"><code class="language-yaml">apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: shop-report
+spec:
+  schedule: "0 8 * * *"
   timeZone: "Asia/Ho_Chi_Minh"
   jobTemplate:
     spec:
+      backoffLimit: 2
       template:
         spec:
-          restartPolicy: OnFailure
+          restartPolicy: Never
           containers:
-            - name: backup
-              image: busybox:1.36
-              command: ["sh", "-c", "echo backup xong"]</code></pre>
-<pre><code class="language-bash">kubectl create job --from=cronjob/nightly-backup chay-thu   # chạy ngay, không chờ lịch
-kubectl logs job/chay-thu</code></pre>
+            - name: report
+              image: postgres:17
+              command: ["psql", "-h", "postgres", "-U", "shop", "-c", "SELECT count(*) FROM orders;"]
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: shop-api-secret
+                      key: DB_PASSWORD</code></pre>
+    <p>Ba tầng lồng nhau: CronJob → <code>jobTemplate</code> (một Job) → <code>template</code> (một Pod). <code>restartPolicy: Never</code>: lỗi thì tạo Pod mới thử lại, tối đa <code>backoffLimit: 2</code> lần. <code>PGPASSWORD</code> là biến <code>psql</code> tự đọc.</p>
 
-    <h2>Hỏi AI</h2>
+    <h3>Bước 3 — Chạy thử ngay, không chờ lịch</h3>
+    <div class="term" data-title="zsh — kind-lab / shop"><pre>$ kubectl apply -f shop-report.yaml
+cronjob.batch/shop-report created
+
+$ kubectl get cronjob
+NAME          SCHEDULE    TIMEZONE           SUSPEND   ACTIVE   LAST SCHEDULE   AGE
+shop-report   0 8 * * *   Asia/Ho_Chi_Minh   False     0        &lt;none&gt;          10s
+
+$ kubectl create job --from=cronjob/shop-report report-thu
+job.batch/report-thu created
+
+$ kubectl get job report-thu
+NAME         STATUS     COMPLETIONS   DURATION   AGE
+report-thu   <span class="ok">Complete</span>   1/1           5s         12s
+
+$ kubectl get pods -l job-name=report-thu
+NAME               READY   STATUS      RESTARTS   AGE
+report-thu-x7k2p   0/1     <span class="ok">Completed</span>   0          12s
+
+$ kubectl logs job/report-thu
+ count
+-------
+     1
+(1 row)</pre></div>
     <ul>
-      <li>“Viết Job chạy migration với image X trước khi Deployment khởi động, thử lại tối đa 3 lần.”</li>
-      <li>“Cú pháp cron cho 8 giờ sáng thứ 2 đến thứ 6.”</li>
+      <li><code>LAST SCHEDULE &lt;none&gt;</code>: lịch chưa chạy lần nào. <code>create job --from</code> tạo Job từ khuôn để thử ngay.</li>
+      <li><code>COMPLETIONS 1/1</code>: Job cần 1 lần thành công, đã đạt. Pod <code>Completed</code>, <code>READY 0/1</code> là bình thường — container đã thoát với mã 0.</li>
+      <li>Log còn đọc được vì Pod chưa bị xóa. CronJob mặc định giữ 3 Job thành công gần nhất.</li>
+    </ul>
+
+    <div class="callout warning" data-title="Mình đã bị dính chỗ này"><p>Bản đầu mình quên <code>timeZone</code>: báo cáo chạy lúc 15:00 thay vì 8:00, vì CronJob hiểu 8:00 là <strong>UTC</strong>. Thêm một lỗi nữa khi thử Job bằng tay: sửa file rồi apply lại thì bị báo <code>field is immutable</code> — template của Job không sửa được, phải xóa Job rồi tạo lại.</p></div>
+    <p>Còn DaemonSet: <code>kubectl get daemonset -n kube-system</code> sẽ thấy <code>kube-proxy</code> và <code>kindnet</code> — thành phần mạng phải có trên <em>mọi</em> node. App thường gặp DaemonSet khi cài agent log (Alloy, Fluent Bit) ở bài Monitoring.</p>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Vì sao không chạy migration bằng Deployment?</summary><p>Deployment luôn giữ Pod chạy: lệnh xong (exit 0) vẫn bị khởi động lại mãi. Job hiểu “xong” và dừng.</p></details>
+      <details><summary>Schedule "0 8 * * *" không có timeZone chạy lúc mấy giờ Việt Nam?</summary><p>15:00 — lịch tính theo UTC, Việt Nam là UTC+7.</p></details>
+      <details><summary>Cluster thêm node mới. DaemonSet cần làm gì?</summary><p>Không cần làm gì: controller tự tạo một Pod trên node mới.</p></details>
+    </div>
+
+    <h2>Hỏi AI để đi sâu hơn</h2>
+    <ul>
+      <li>“Viết Job chạy migration database trước khi Deployment mới lên, và so sánh với Helm hook hoặc Argo CD PreSync hook.”</li>
+      <li>“Giải thích concurrencyPolicy, startingDeadlineSeconds, ttlSecondsAfterFinished của CronJob, mỗi cái kèm một ví dụ.”</li>
+      <li>“Taint và toleration là gì? Vì sao DaemonSet của tôi không chạy trên node control-plane?”</li>
     </ul>
   </section>
 
-  <section class="lesson" id="resources-hpa" data-part="2 · Tra cứu khi cần" data-title="Resource và autoscaling" data-minutes="5" data-updated="2026-11-15" data-done="false" data-summary="Requests, limits và để HPA tự tăng giảm số Pod.">
-    <div class="callout note" data-title="Dùng khi"><p>Pod bị OOMKilled, node quá tải, hoặc muốn số Pod tự tăng khi đông người dùng.</p></div>
+  <section class="lesson" id="resources-hpa" data-part="2 · Nâng cao" data-title="Resource và autoscaling (HPA)" data-minutes="12" data-practice="30" data-updated="2026-11-16" data-done="false" data-summary="Requests, limits, và để HorizontalPodAutoscaler tự tăng giảm số Pod theo CPU.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><code>requests</code> = phần được giữ chỗ, scheduler dựa vào đó xếp Pod. <code>limits</code> = trần.</li>
+        <li>Vượt trần <strong>memory</strong> → container bị giết (<code>OOMKilled</code>). Vượt trần <strong>CPU</strong> → chỉ bị chạy chậm lại (throttle).</li>
+        <li><strong>HPA</strong> tăng giảm <code>replicas</code> theo % CPU <em>so với requests</em>. Cần <strong>metrics-server</strong> và Deployment phải có CPU requests.</li>
+      </ul>
+    </div>
 
-    <h2>Ý chính</h2>
-    <ul>
-      <li><code>requests</code> — phần được đảm bảo, scheduler dùng để xếp Pod. <code>limits</code> — trần.</li>
-      <li>Vượt <strong>memory</strong> limit → container bị giết (OOMKilled). Vượt <strong>CPU</strong> limit → chỉ bị chạy chậm lại.</li>
-      <li><strong>HPA</strong> tăng giảm replicas theo % CPU so với requests. Cần metrics-server (cloud thường có sẵn).</li>
-      <li>Xem mức dùng thực tế: <code>kubectl top pods</code>.</li>
-    </ul>
+    <h2>Vấn đề và ví von</h2>
+    <p>shop-api đang cố định <code>replicas: 2</code>. Giờ cao điểm 2 Pod quá tải, nửa đêm thì thừa. Mình muốn số Pod <strong>tự đổi theo tải</strong>, và để làm được thì Kubernetes phải biết “tải cao” là bao nhiêu — chính là con số <code>requests</code> đã khai ở bài 4.</p>
+    <p>Ví von: <code>requests</code> như <strong>đặt bàn trước</strong> ở nhà hàng, <code>limits</code> là sức chứa tối đa của bàn; HPA là <strong>quản lý mở thêm quầy</strong> khi thấy hàng dài.</p>
+    <table>
+      <thead><tr><th></th><th>requests</th><th>limits</th></tr></thead>
+      <tbody>
+        <tr><td>CPU</td><td>Scheduler giữ chỗ; mốc 100% của HPA</td><td>Vượt → bị throttle, chạy chậm</td></tr>
+        <tr><td>Memory</td><td>Scheduler giữ chỗ</td><td>Vượt → <code>OOMKilled</code>, exit code 137</td></tr>
+      </tbody>
+    </table>
+    <figure class="diagram">
+      <svg class="dg" viewBox="0 0 720 190" role="img" aria-label="Vòng lặp HPA: metrics-server, HPA, Deployment, Pod"><defs><marker id="k82-h4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="k82-a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="ok" x="16" y="30" width="150" height="62" rx="8"/>
+<text x="91" y="56" class="b" text-anchor="middle">Pod shop-api × N</text>
+<text x="91" y="76" class="s" text-anchor="middle">đang dùng CPU</text>
+<rect class="box" x="196" y="30" width="150" height="62" rx="8"/>
+<text x="271" y="56" class="b" text-anchor="middle">metrics-server</text>
+<text x="271" y="76" class="s" text-anchor="middle">đo mỗi ~15 giây</text>
+<rect class="acc" x="376" y="30" width="150" height="62" rx="8"/>
+<text x="451" y="56" class="b" text-anchor="middle">HPA shop-api</text>
+<text x="451" y="76" class="s" text-anchor="middle">so với mục tiêu 50%</text>
+<rect class="box" x="556" y="30" width="150" height="62" rx="8"/>
+<text x="631" y="56" class="b" text-anchor="middle">Deployment</text>
+<text x="631" y="76" class="s m" text-anchor="middle">replicas: 2 → 6</text>
+<path class="ln" d="M166,61 H192" marker-end="url(#k82-h4)"/>
+<path class="ln" d="M346,61 H372" marker-end="url(#k82-h4)"/>
+<path class="ln-a" d="M526,61 H552" marker-end="url(#k82-a4)"/>
+<path class="ln-a dash" d="M631,92 V140 H91 V96" marker-end="url(#k82-a4)"/>
+<text x="360" y="160" class="s a" text-anchor="middle">tạo thêm hoặc bớt Pod, rồi đo lại</text>
+<text x="360" y="182" class="s" text-anchor="middle">số Pod mới = ⌈ số Pod hiện tại × CPU hiện tại / mục tiêu ⌉</text>
+      </svg>
+      <figcaption>HPA là thêm một vòng lặp điều hòa nữa: đo → so sánh → sửa <code>replicas</code>.</figcaption>
+    </figure>
 
-    <h2>Mẫu tối thiểu: HPA</h2>
-<pre><code class="language-yaml">apiVersion: autoscaling/v2
+    <h2>Làm từng bước: HPA cho shop-api</h2>
+    <h3>Bước 1 — Cài metrics-server</h3>
+    <p>kind không có sẵn. Cài bằng Helm; cờ <code>--kubelet-insecure-tls</code> cần cho kind vì chứng chỉ kubelet là tự ký:</p>
+    <div class="term" data-title="zsh — kind-lab / shop"><pre>$ helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+"metrics-server" has been added to your repositories
+
+$ helm upgrade --install metrics-server metrics-server/metrics-server -n kube-system --set args={--kubelet-insecure-tls}
+Release "metrics-server" does not exist. Installing it now.
+NAME: metrics-server
+LAST DEPLOYED: Mon Nov 16 09:20:11 2026
+NAMESPACE: kube-system
+STATUS: deployed
+REVISION: 1
+
+$ kubectl top pods -l app=shop-api
+NAME                       CPU(cores)   MEMORY(bytes)
+shop-api-7b9c8d6f4-pq3zn   1m           14Mi
+shop-api-7b9c8d6f4-x8wlt   1m           13Mi</pre></div>
+    <p>Mỗi Pod dùng 1m CPU trên 100m requests — tức 1%. Ngay sau khi cài, <code>kubectl top</code> có thể báo <code>error: Metrics API not available</code>; chờ thêm một phút.</p>
+
+    <h3>Bước 2 — Viết HPA</h3>
+<pre data-file="shop-api-hpa.yaml" data-add="1-11"><code class="language-yaml">apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
-metadata: { name: api }
+metadata:
+  name: shop-api
 spec:
-  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: api }
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: shop-api
   minReplicas: 2
-  maxReplicas: 10
+  maxReplicas: 6</code></pre>
+    <p><code>scaleTargetRef</code>: HPA điều khiển Deployment nào. Số Pod luôn nằm trong khoảng 2–6.</p>
+<pre data-file="shop-api-hpa.yaml" data-add="12-18"><code class="language-yaml">apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: shop-api
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: shop-api
+  minReplicas: 2
+  maxReplicas: 6
   metrics:
     - type: Resource
-      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }</code></pre>
-    <div class="callout tip"><p>Deployment không khai CPU requests thì HPA theo CPU không chạy được.</p></div>
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50</code></pre>
+    <p>“Giữ CPU trung bình mỗi Pod quanh 50% requests” — với 100m requests là khoảng 50m.</p>
 
-    <h2>Hỏi AI</h2>
+    <h3>Bước 3 — Tạo tải và quan sát</h3>
+    <div class="term" data-title="zsh — kind-lab / shop"><pre>$ kubectl apply -f shop-api-hpa.yaml
+horizontalpodautoscaler.autoscaling/shop-api created
+
+$ kubectl run load --image=busybox:1.36 --restart=Never -- /bin/sh -c "while true; do wget -q -O- http://shop-api &gt; /dev/null; done"
+pod/load created
+
+$ kubectl get hpa shop-api -w
+NAME       REFERENCE             TARGETS         MINPODS   MAXPODS   REPLICAS   AGE
+shop-api   Deployment/shop-api   cpu: 1%/50%     2         6         2          40s
+shop-api   Deployment/shop-api   cpu: <span class="err">138%</span>/50%   2         6         2          75s
+shop-api   Deployment/shop-api   cpu: 138%/50%   2         6         <span class="ok">6</span>          90s
+shop-api   Deployment/shop-api   cpu: 46%/50%    2         6         6          2m</pre></div>
     <ul>
-      <li>“Pod của tôi dùng khoảng 300Mi RAM, đỉnh 450Mi — nên đặt requests/limits thế nào?”</li>
-      <li>“Cài metrics-server trên kind.” · “KEDA scale theo độ dài hàng đợi RabbitMQ.”</li>
+      <li><code>TARGETS cpu: 138%/50%</code> — hiện tại / mục tiêu. ⌈2 × 138 / 50⌉ = 6, đúng bằng <code>MAXPODS</code>.</li>
+      <li>Tải chia cho 6 Pod nên CPU trung bình về 46%. Xóa Pod <code>load</code>: HPA chờ khoảng 5 phút (cửa sổ ổn định khi giảm) rồi mới trả về 2, để không tăng giảm liên tục.</li>
+    </ul>
+
+    <div class="callout warning" data-title="Mình đã bị dính chỗ này"><p>Đang 6 Pod, mình sửa ConfigMap trong <code>shop-api.yaml</code> rồi apply — số Pod tụt về 2, vì file vẫn ghi <code>replicas: 2</code>. Khi đã có HPA, <strong>xóa dòng <code>replicas</code></strong> khỏi Deployment để HPA là chủ duy nhất của con số đó. Lần apply đầu tiên sau khi xóa, Deployment có thể tạm về 1 Pod trước khi HPA kéo lên lại <code>minReplicas</code>.</p></div>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>kubectl get hpa hiện cpu: &lt;unknown&gt;/50%. Hai nguyên nhân hay gặp?</summary><p>Chưa có metrics-server (hoặc chưa sẵn sàng), hoặc container trong Deployment không khai CPU requests nên không tính được phần trăm.</p></details>
+      <details><summary>Container vượt memory limit và vượt CPU limit khác nhau thế nào?</summary><p>Memory: bị giết, trạng thái OOMKilled. CPU: không bị giết, chỉ bị giới hạn nên chạy chậm.</p></details>
+      <details><summary>3 Pod, CPU trung bình 90%, mục tiêu 60%. HPA muốn bao nhiêu Pod?</summary><p>⌈3 × 90 / 60⌉ = ⌈4,5⌉ = 5 (nếu maxReplicas cho phép).</p></details>
+    </div>
+
+    <h2>Hỏi AI để đi sâu hơn</h2>
+    <ul>
+      <li>“Pod của tôi dùng khoảng 300Mi RAM, đỉnh 450Mi, CPU dao động 50–400m. Nên đặt requests/limits thế nào, và QoS class Guaranteed/Burstable/BestEffort là gì?”</li>
+      <li>“Giải thích trường behavior của HPA autoscaling/v2 (scaleUp, scaleDown, stabilizationWindowSeconds) kèm ví dụ.”</li>
+      <li>“So sánh HPA, VPA, KEDA và Cluster Autoscaler/Karpenter: mỗi cái scale cái gì, khi nào dùng?”</li>
     </ul>
   </section>
 
-  <section class="lesson" id="trien-khai" data-part="2 · Tra cứu khi cần" data-title="Đóng gói và triển khai: Helm, Kustomize, GitOps" data-minutes="7" data-updated="2026-11-15" data-done="false" data-summary="Quản lý YAML cho nhiều môi trường và tự động deploy từ Git.">
-    <div class="callout note" data-title="Dùng khi"><p>Cùng một app chạy ở dev/staging/prod, hoặc team muốn deploy bằng pull request thay vì chạy kubectl tay.</p></div>
+  <section class="lesson" id="trien-khai" data-part="2 · Nâng cao" data-title="Đóng gói và triển khai: Kustomize, Helm, GitOps" data-minutes="12" data-practice="40" data-updated="2026-11-16" data-done="false" data-summary="Một bộ YAML cho nhiều môi trường bằng Kustomize, cài phần mềm có sẵn bằng Helm, và để Argo CD tự deploy từ Git.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><strong>Kustomize</strong> (có sẵn trong kubectl): YAML gốc (<em>base</em>) + lớp sửa cho từng môi trường (<em>overlay</em>). <code>kubectl apply -k</code>.</li>
+        <li><strong>Helm</strong>: chart = template + <code>values.yaml</code>; mỗi lần cài/nâng cấp là một <em>revision</em>, rollback được.</li>
+        <li><strong>GitOps</strong> (Argo CD, Flux): Git là nguồn sự thật, agent trong cluster tự kéo về và giữ cluster khớp với Git.</li>
+      </ul>
+    </div>
 
-    <h2>Ý chính</h2>
-    <table>
-      <thead><tr><th>Công cụ</th><th>Là gì</th><th>Gặp ở đâu</th></tr></thead>
-      <tbody>
-        <tr><td><strong>Helm</strong></td><td>“Package manager”: chart = template YAML + <code>values.yaml</code>.</td><td>Cài phần mềm có sẵn (Redis, Prometheus…), chart nội bộ của công ty.</td></tr>
-        <tr><td><strong>Kustomize</strong></td><td>YAML gốc (base) + lớp vá cho từng môi trường (overlay). Có sẵn trong kubectl.</td><td>App nội bộ ít khác biệt giữa môi trường.</td></tr>
-        <tr><td><strong>Argo CD / Flux</strong></td><td>GitOps: agent trong cluster tự đồng bộ cluster theo repo Git.</td><td>Hầu hết công ty dùng k8s nghiêm túc.</td></tr>
-      </tbody>
-    </table>
+    <h2>Vấn đề và ví von</h2>
+    <p><code>shop-api.yaml</code> cần chạy ở dev (1 Pod) và prod (3 Pod, bản đã kiểm chứng). Copy thành hai file thì sớm muộn lệch nhau; và không ai biết ai đã apply gì lên prod.</p>
+    <p>Ví von: Kustomize là <strong>bản vẽ gốc + giấy can</strong> dán đè chỗ khác biệt; GitOps là <strong>giám sát công trình</strong> liên tục đối chiếu với bản vẽ trong Git.</p>
+    <figure class="diagram">
+      <svg class="dg" viewBox="0 0 720 220" role="img" aria-label="Repo Git chứa base và overlay, Argo CD đồng bộ vào hai namespace"><defs><marker id="k82-h5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="k82-a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="zone" x="10" y="10" width="250" height="200" rx="10"/>
+<text x="26" y="34" class="b">Repo Git k8s-lab</text>
+<rect class="box" x="26" y="48" width="218" height="40" rx="6"/>
+<text x="38" y="73" class="m">base/ · Deployment, Service</text>
+<rect class="ok" x="26" y="104" width="218" height="40" rx="6"/>
+<text x="38" y="129" class="m">overlays/dev/ · 1 Pod</text>
+<rect class="warn" x="26" y="160" width="218" height="40" rx="6"/>
+<text x="38" y="185" class="m">overlays/prod/ · 3 Pod</text>
+<rect class="acc" x="300" y="80" width="150" height="70" rx="8"/>
+<text x="375" y="106" class="b" text-anchor="middle">Argo CD</text>
+<text x="375" y="126" class="s" text-anchor="middle">kéo Git về, build,</text>
+<text x="375" y="142" class="s" text-anchor="middle">so với cluster</text>
+<rect class="ok" x="500" y="48" width="200" height="56" rx="8"/>
+<text x="600" y="72" class="b" text-anchor="middle">namespace shop-dev</text>
+<text x="600" y="92" class="s" text-anchor="middle">shop-api × 1</text>
+<rect class="warn" x="500" y="126" width="200" height="56" rx="8"/>
+<text x="600" y="150" class="b" text-anchor="middle">namespace shop-prod</text>
+<text x="600" y="170" class="s" text-anchor="middle">shop-api × 3</text>
+<path class="ln dash" d="M260,115 H296" marker-end="url(#k82-h5)"/>
+<path class="ln-a" d="M450,104 L496,80" marker-end="url(#k82-a5)"/>
+<path class="ln-a" d="M450,126 L496,150" marker-end="url(#k82-a5)"/>
+      </svg>
+      <figcaption>Một base, mỗi môi trường một overlay; Argo CD giữ mỗi namespace khớp với thư mục tương ứng trong Git.</figcaption>
+    </figure>
 
-    <h2>Lệnh Helm hay dùng</h2>
+    <h2>Làm từng bước: Kustomize base và overlay prod</h2>
+    <p><code>shop-api/base/shop-api.yaml</code> là Deployment + Service của bài 9 (bỏ ConfigMap và <code>secretRef</code> cho gọn).</p>
+    <h3>Bước 1 — Base</h3>
+<pre data-file="shop-api/base/kustomization.yaml" data-add="1-8"><code class="language-yaml">apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - shop-api.yaml
+configMapGenerator:
+  - name: shop-api-config
+    literals:
+      - PODINFO_UI_MESSAGE=Shop API</code></pre>
+    <p><code>configMapGenerator</code> sinh ConfigMap thay cho viết tay.</p>
+
+    <h3>Bước 2 — Overlay prod</h3>
+<pre data-file="shop-api/overlays/prod/kustomization.yaml" data-add="1-5"><code class="language-yaml">apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: shop-prod
+resources:
+  - ../../base</code></pre>
+    <p>“Lấy toàn bộ base, đặt vào namespace <code>shop-prod</code>.” Giờ thêm những gì prod khác:</p>
+<pre data-file="shop-api/overlays/prod/kustomization.yaml" data-add="6-16"><code class="language-yaml">apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: shop-prod
+resources:
+  - ../../base
+replicas:
+  - name: shop-api
+    count: 3
+images:
+  - name: ghcr.io/stefanprodan/podinfo
+    newTag: 6.7.0
+configMapGenerator:
+  - name: shop-api-config
+    behavior: merge
+    literals:
+      - PODINFO_UI_MESSAGE=Shop API - prod</code></pre>
+    <p>3 Pod, tag <code>6.7.0</code>, message riêng (<code>merge</code> = ghi đè key của base) — không sửa dòng nào của <code>shop-api.yaml</code>.</p>
+
+    <h3>Bước 3 — Xem YAML sinh ra rồi apply</h3>
+    <div class="term" data-title="zsh — kind-lab / k8s-lab"><pre>$ kubectl kustomize shop-api/overlays/prod | grep -E 'name: shop-api-config|namespace:|replicas:|image:'
+  name: shop-api-config-<span class="hl">9t4m6bfmdb</span>
+  namespace: shop-prod
+  namespace: shop-prod
+  namespace: shop-prod
+  replicas: 3
+            name: shop-api-config-<span class="hl">9t4m6bfmdb</span>
+        image: ghcr.io/stefanprodan/podinfo:6.7.0
+
+$ kubectl create namespace shop-prod
+namespace/shop-prod created
+
+$ kubectl apply -k shop-api/overlays/prod
+configmap/shop-api-config-9t4m6bfmdb created
+service/shop-api created
+deployment.apps/shop-api created</pre></div>
+    <ul>
+      <li><code>kubectl kustomize</code> chỉ in YAML, không đụng cluster — xem trước khi apply.</li>
+      <li>ConfigMap có <strong>đuôi hash</strong> theo nội dung. Đổi message là tên đổi (<code>…-hg24g89kb9</code>) → template Deployment đổi → tự rolling update. Bẫy “sửa ConfigMap mà app không đổi” ở bài 6 biến mất.</li>
+    </ul>
+
+    <h2>Helm và GitOps trong một phút</h2>
+    <p><strong>Helm</strong> hợp để cài phần mềm đóng gói sẵn (Traefik, metrics-server). Lệnh hằng ngày:</p>
 <pre><code class="language-bash">helm repo add podinfo https://stefanprodan.github.io/podinfo
-helm install demo podinfo/podinfo -n demo --create-namespace -f values.yaml
-helm upgrade demo podinfo/podinfo -n demo -f values.yaml
-helm list -n demo
-helm rollback demo 1 -n demo
-helm template demo podinfo/podinfo -f values.yaml     # xem YAML sinh ra, không cài</code></pre>
+helm install demo podinfo/podinfo --version 6.7.1 -n demo -f values-demo.yaml
+helm upgrade demo podinfo/podinfo --version 6.7.1 -n demo -f values-demo.yaml
+helm history demo -n demo        # các revision
+helm rollback demo 1 -n demo     # quay về revision 1
+helm template demo podinfo/podinfo -f values-demo.yaml   # chỉ in YAML</code></pre>
+    <p><strong>GitOps</strong>: đẩy <code>shop-api/</code> lên repo Git, cài Argo CD (<code>kubectl create namespace argocd</code> rồi <code>kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml</code>), khai một <code>Application</code>:</p>
+<pre data-file="shop-api-prod-app.yaml"><code class="language-yaml">apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: shop-api-prod
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/&lt;tai-khoan&gt;/k8s-lab.git
+    targetRevision: main
+    path: shop-api/overlays/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: shop-prod
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true</code></pre>
+    <p>Deploy = merge PR đổi <code>newTag</code>; rollback = revert commit. <code>selfHeal</code> trả lại mọi sửa tay.</p>
 
-    <h2>Luồng GitOps điển hình</h2>
-<pre><code class="language-text">push code ─► CI build image (tag = commit SHA) ─► cập nhật tag trong repo cấu hình
-                                                         │
-                                       Argo CD thấy thay đổi ─► đồng bộ cluster</code></pre>
-    <p>Rollback = revert commit trong repo cấu hình. Sửa tay trên cluster sẽ bị Argo CD đưa về như Git.</p>
+    <div class="callout warning" data-title="Mình đã bị dính chỗ này"><p>Mình <code>kubectl scale</code> prod lên 5 Pod cho nhanh; vài giây sau về lại 3 vì <code>selfHeal</code>. Với GitOps, <strong>mọi thay đổi đi qua Git</strong>; muốn tự scale thì dùng HPA và bỏ <code>replicas</code> khỏi overlay.</p></div>
 
-    <h2>Hỏi AI</h2>
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Kustomize và Helm, cái nào cho app nội bộ của team, cái nào cho phần mềm bên ngoài?</summary><p>Thường Kustomize cho app nội bộ, Helm cho phần mềm đóng gói sẵn. Nhiều team dùng cả hai.</p></details>
+      <details><summary>Vì sao ConfigMap sinh bởi configMapGenerator có đuôi hash?</summary><p>Nội dung đổi thì tên đổi, template Deployment đổi theo nên Pod được thay tự động.</p></details>
+      <details><summary>Dùng Argo CD với selfHeal, rollback bản lỗi thế nào?</summary><p>Revert commit trong Git. rollout undo bằng tay sẽ bị đưa ngược lại.</p></details>
+    </div>
+
+    <h2>Hỏi AI để đi sâu hơn</h2>
     <ul>
-      <li>“Chuyển file app.yaml của tôi thành Helm chart có values cho image, replicas, host.”</li>
-      <li>“Cấu trúc Kustomize base + overlay dev/prod, prod 3 replicas và tag image khác.”</li>
-      <li>“Viết Argo CD Application trỏ tới repo X, thư mục overlays/prod, bật auto sync.”</li>
-      <li>“GitHub Actions build Docker image và push lên ghcr.io với tag commit SHA.”</li>
+      <li>“Chuyển shop-api.yaml thành Helm chart có values cho image, replicas, host. Giải thích từng file.”</li>
+      <li>“Thiết kế CI/CD: GitHub Actions build image theo commit SHA, cập nhật newTag, Argo CD sync. Secret để đâu?”</li>
+      <li>“App of Apps và ApplicationSet của Argo CD là gì? So sánh Argo CD với Flux.”</li>
     </ul>
   </section>
 
-  <section class="lesson" id="bao-mat" data-part="2 · Tra cứu khi cần" data-title="Bảo mật: RBAC, NetworkPolicy, securityContext" data-minutes="6" data-updated="2026-11-15" data-done="false" data-summary="Ai được làm gì với cluster, Pod được gọi tới đâu, container chạy với quyền gì.">
-    <div class="callout note" data-title="Dùng khi"><p>Bị báo <code>Forbidden</code> khi chạy kubectl, cần cấp quyền cho app/CI, hoặc team yêu cầu siết bảo mật.</p></div>
+  <section class="lesson" id="bao-mat" data-part="2 · Nâng cao" data-title="Bảo mật: RBAC, NetworkPolicy, Pod Security" data-minutes="12" data-practice="30" data-updated="2026-11-16" data-done="false" data-summary="Ai được làm gì với cluster, Pod được gọi tới đâu, container chạy với quyền gì.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><strong>RBAC</strong>: <code>Role</code> liệt kê quyền (verbs trên resources), <code>RoleBinding</code> gán Role cho user hoặc <strong>ServiceAccount</strong> (danh tính của Pod, CI).</li>
+        <li>Kiểm tra quyền: <code>kubectl auth can-i &lt;verb&gt; &lt;resource&gt; --as=…</code>.</li>
+        <li>Mặc định mọi Pod gọi được mọi Pod; <strong>NetworkPolicy</strong> siết lại. <strong>Pod Security Admission</strong> chặn Pod chạy với quyền quá rộng.</li>
+        <li>Nguyên tắc chung: <strong>quyền tối thiểu</strong> (least privilege).</li>
+      </ul>
+    </div>
 
-    <h2>Ý chính</h2>
-    <ul>
-      <li><strong>RBAC</strong>: <code>Role</code> liệt kê quyền (verbs trên resources) → <code>RoleBinding</code> gán cho user hoặc <strong>ServiceAccount</strong> (danh tính của Pod). Bản cấp cluster: <code>ClusterRole</code>/<code>ClusterRoleBinding</code>.</li>
-      <li><strong>NetworkPolicy</strong>: mặc định mọi Pod gọi được nhau. NetworkPolicy giới hạn ai được gọi ai (ví dụ: chỉ api được gọi database).</li>
-      <li><strong>securityContext</strong>: không chạy bằng root, filesystem chỉ đọc, bỏ bớt capability.</li>
-      <li>Nguyên tắc: quyền tối thiểu. Không bao giờ gán <code>cluster-admin</code> cho app.</li>
-    </ul>
+    <h2>Vấn đề và ví von</h2>
+    <p>Pipeline CI cần deploy shop-api. Đưa nó kubeconfig admin thì lộ một token là mất cả cluster. Cần một danh tính chỉ được <em>cập nhật Deployment trong <code>shop</code></em>.</p>
+    <p>Ví von: ServiceAccount là <strong>thẻ nhân viên</strong>, Role là <strong>danh sách cửa được mở</strong>, RoleBinding là việc <strong>nạp danh sách đó vào thẻ</strong>.</p>
+    <figure class="diagram">
+      <svg class="dg" viewBox="0 0 720 200" role="img" aria-label="RoleBinding nối ServiceAccount với Role trong namespace shop"><defs><marker id="k82-h6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="k82-a6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="zone" x="10" y="10" width="700" height="180" rx="10"/>
+<text x="26" y="34" class="b">namespace shop</text>
+<rect class="box" x="30" y="60" width="190" height="80" rx="8"/>
+<text x="125" y="86" class="b" text-anchor="middle">ServiceAccount</text>
+<text x="125" y="106" class="s m" text-anchor="middle">ci-deployer</text>
+<text x="125" y="126" class="s" text-anchor="middle">“thẻ nhân viên” của CI</text>
+<rect class="acc" x="265" y="60" width="190" height="80" rx="8"/>
+<text x="360" y="86" class="b" text-anchor="middle">RoleBinding</text>
+<text x="360" y="106" class="s m" text-anchor="middle">ci-deployer</text>
+<text x="360" y="126" class="s" text-anchor="middle">nối thẻ với quyền</text>
+<rect class="ok" x="500" y="60" width="190" height="80" rx="8"/>
+<text x="595" y="86" class="b" text-anchor="middle">Role deployer</text>
+<text x="595" y="106" class="s m" text-anchor="middle">deployments:</text>
+<text x="595" y="126" class="s m" text-anchor="middle">get list update patch</text>
+<path class="ln-a" d="M265,100 H224" marker-end="url(#k82-a6)"/>
+<path class="ln-a" d="M455,100 H496" marker-end="url(#k82-a6)"/>
+<text x="360" y="172" class="s" text-anchor="middle">ngoài danh sách (secrets, pods, namespace khác) → Forbidden</text>
+      </svg>
+      <figcaption>Role chỉ có hiệu lực trong namespace của nó. Bản cho cả cluster là ClusterRole / ClusterRoleBinding.</figcaption>
+    </figure>
 
-    <h2>Lệnh đáng nhớ</h2>
-<pre><code class="language-bash">kubectl auth can-i delete pods -n shop                 # tôi có quyền không?
-kubectl auth can-i list secrets -n shop \
-  --as=system:serviceaccount:shop:api                  # ServiceAccount api có quyền không?</code></pre>
+    <h2>Làm từng bước: quyền cho CI</h2>
+    <h3>Bước 1 — Tạo danh tính và thử quyền</h3>
+    <div class="term" data-title="zsh — kind-lab / shop"><pre>$ kubectl create serviceaccount ci-deployer
+serviceaccount/ci-deployer created
 
-    <h2>Mẫu tối thiểu: securityContext</h2>
-<pre><code class="language-yaml">securityContext:              # đặt trong container
-  runAsNonRoot: true
-  allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: true
-  capabilities: { drop: ["ALL"] }</code></pre>
+$ kubectl auth can-i patch deployments --as=system:serviceaccount:shop:ci-deployer
+<span class="err">no</span></pre></div>
+    <p><code>--as</code> giả danh một người dùng khác; ServiceAccount có tên đầy đủ <code>system:serviceaccount:&lt;namespace&gt;:&lt;tên&gt;</code>. Mới tạo thì chưa có quyền gì.</p>
 
-    <h2>Hỏi AI</h2>
-    <ul>
-      <li>“Viết Role + RoleBinding cho ServiceAccount ci-deployer được apply Deployment trong namespace shop.”</li>
-      <li>“NetworkPolicy chỉ cho Pod app=api kết nối Pod app=postgres cổng 5432.”</li>
-    </ul>
-  </section>
+    <h3>Bước 2 — Role</h3>
+<pre data-file="ci-deployer-rbac.yaml" data-add="1-10"><code class="language-yaml">apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: deployer
+  namespace: shop
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+---</code></pre>
+    <p>Mỗi rule: <em>nhóm API</em> + <em>loại object</em> + <em>động từ</em>. Deployment thuộc nhóm <code>apps</code> — chính là phần trước dấu <code>/</code> trong <code>apiVersion: apps/v1</code>. Không có <code>create</code>/<code>delete</code>: CI chỉ cập nhật cái đã có.</p>
 
-  <section class="lesson" id="monitoring" data-part="2 · Tra cứu khi cần" data-title="Monitoring và log" data-minutes="5" data-updated="2026-11-15" data-done="false" data-summary="Biết hệ thống có khỏe không và chuyện gì đã xảy ra.">
-    <div class="callout note" data-title="Dùng khi"><p>Cần dashboard, cảnh báo khi có sự cố, hoặc tìm log của Pod đã bị xóa.</p></div>
+    <h3>Bước 3 — RoleBinding</h3>
+<pre data-file="ci-deployer-rbac.yaml" data-add="11-23"><code class="language-yaml">apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: deployer
+  namespace: shop
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ci-deployer
+  namespace: shop
+subjects:
+  - kind: ServiceAccount
+    name: ci-deployer
+    namespace: shop
+roleRef:
+  kind: Role
+  name: deployer
+  apiGroup: rbac.authorization.k8s.io</code></pre>
+    <div class="term" data-title="zsh — kind-lab / shop"><pre>$ kubectl apply -f ci-deployer-rbac.yaml
+role.rbac.authorization.k8s.io/deployer created
+rolebinding.rbac.authorization.k8s.io/ci-deployer created
 
-    <h2>Ý chính</h2>
+$ kubectl auth can-i patch deployments --as=system:serviceaccount:shop:ci-deployer
+<span class="ok">yes</span>
+
+$ kubectl auth can-i get secrets --as=system:serviceaccount:shop:ci-deployer
+no
+
+$ kubectl get pods --as=system:serviceaccount:shop:ci-deployer
+<span class="err">Error from server (Forbidden)</span>: pods is forbidden: User "system:serviceaccount:shop:ci-deployer" cannot list resource "pods" in API group "" in the namespace "shop"</pre></div>
+    <p>Đọc lỗi Forbidden như một câu: <em>ai</em> không được <em>làm gì</em> (<code>list</code>) với <em>cái gì</em> (<code>pods</code>, nhóm <code>""</code> = nhóm lõi) <em>ở đâu</em> (<code>shop</code>). Token cho CI: <code>kubectl create token ci-deployer</code>.</p>
+
+    <div class="callout warning" data-title="Mình đã bị dính chỗ này"><p>Lần đầu mình viết <code>apiGroups: [""]</code> cho deployments, apply không lỗi nhưng <code>can-i</code> vẫn <code>no</code>. Nhóm <code>""</code> chỉ gồm object lõi (<code>apiVersion: v1</code>: pods, services, secrets, configmaps). Deployment là <code>apps</code>, Ingress là <code>networking.k8s.io</code>.</p></div>
+
+    <h2>Hai lớp nữa nên biết</h2>
     <table>
-      <thead><tr><th>Nhu cầu</th><th>Bộ công cụ phổ biến</th></tr></thead>
+      <thead><tr><th>Lớp</th><th>Làm gì</th><th>Ví dụ ngắn</th></tr></thead>
       <tbody>
-        <tr><td>Metric + dashboard + cảnh báo</td><td><strong>Prometheus + Grafana + Alertmanager</strong> (cài cả bộ bằng chart <code>kube-prometheus-stack</code>)</td></tr>
-        <tr><td>Log tập trung</td><td>Fluent Bit / Grafana Alloy thu log → <strong>Loki</strong> hoặc Elasticsearch</td></tr>
-        <tr><td>Trace một request qua nhiều service</td><td><strong>OpenTelemetry</strong> → Tempo / Jaeger</td></tr>
+        <tr><td><strong>NetworkPolicy</strong></td><td>Pod nào được gọi Pod nào; thường “cấm hết” rồi mở từng đường.</td><td>Chỉ <code>app=shop-api</code> được gọi <code>postgres:5432</code>.</td></tr>
+        <tr><td><strong>securityContext</strong> + <strong>Pod Security Admission</strong></td><td>Không chạy root, không leo quyền; namespace gắn nhãn để từ chối Pod vi phạm.</td><td><code>kubectl label ns shop pod-security.kubernetes.io/enforce=restricted</code></td></tr>
       </tbody>
     </table>
-    <ul>
-      <li><code>kubectl logs</code> mất khi Pod bị xóa — production luôn cần log tập trung.</li>
-      <li>App nên ghi log ra stdout, dạng JSON, và mở <code>/metrics</code> cho Prometheus.</li>
-    </ul>
 
-    <h2>Hỏi AI</h2>
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Role và ClusterRole khác nhau thế nào?</summary><p>Role chỉ có hiệu lực trong một namespace; ClusterRole cho cả cluster hoặc cho object không có namespace (node, PV).</p></details>
+      <details><summary>Làm sao biết ServiceAccount api trong namespace shop có đọc được Secret không?</summary><p>kubectl auth can-i get secrets -n shop --as=system:serviceaccount:shop:api</p></details>
+      <details><summary>Áp enforce=restricted cho namespace, Deployment báo created nhưng không có Pod nào. Xem lý do ở đâu?</summary><p>kubectl describe replicaset của Deployment đó: Events có FailedCreate kèm “violates PodSecurity …” liệt kê các trường vi phạm.</p></details>
+    </div>
+
+    <h2>Hỏi AI để đi sâu hơn</h2>
     <ul>
-      <li>“PromQL: CPU từng Pod trong namespace shop trong 5 phút qua.”</li>
-      <li>“Viết ServiceMonitor cho Service api cổng http, path /metrics.”</li>
-      <li>“Cảnh báo khi Pod restart quá 3 lần trong 1 giờ.”</li>
+      <li>“Viết NetworkPolicy cho namespace shop: mặc định cấm ingress, chỉ cho Traefik gọi shop-api, chỉ shop-api gọi postgres 5432. Làm sao kiểm tra CNI của tôi có thực thi NetworkPolicy không?”</li>
+      <li>“Viết securityContext đạt chuẩn Pod Security restricted cho một container chạy podinfo: runAsNonRoot, runAsUser, seccompProfile, capabilities, readOnlyRootFilesystem.”</li>
+      <li>“So sánh Pod Security Admission, Kyverno và OPA Gatekeeper: khi nào cần policy engine riêng?”</li>
     </ul>
-    <div class="callout tip"><p>Muốn đi xa hơn với Kubernetes: chứng chỉ <strong>CKAD</strong> (cho developer) là đích hợp lý — nó kiểm tra đúng những gì Phần 1 dạy, cộng một phần Phần 2.</p></div>
+  </section>
+
+  <section class="lesson" id="monitoring" data-part="2 · Nâng cao" data-title="Monitoring và log: Prometheus, Grafana, Loki" data-minutes="12" data-practice="40" data-updated="2026-11-16" data-done="false" data-summary="Thu metric bằng Prometheus, xem dashboard trên Grafana, nhận cảnh báo, và giữ log sau khi Pod mất.">
+    <div class="callout note" data-title="Cần nhớ">
+      <ul>
+        <li><strong>Prometheus</strong> định kỳ <em>kéo</em> (scrape) metric từ <code>/metrics</code> của app; <strong>Grafana</strong> vẽ dashboard; <strong>Alertmanager</strong> gửi cảnh báo.</li>
+        <li>Cài cả bộ bằng chart <code>prometheus-community/kube-prometheus-stack</code>. Khai báo app cần scrape bằng <strong>ServiceMonitor</strong>.</li>
+        <li>ServiceMonitor chọn <strong>Service theo nhãn</strong> và chỉ cổng <strong>theo tên</strong>; phải mang nhãn <code>release: &lt;tên release&gt;</code>.</li>
+        <li><code>kubectl logs</code> mất theo Pod → production cần log tập trung (Alloy → Loki).</li>
+      </ul>
+    </div>
+
+    <h2>Vấn đề và ví von</h2>
+    <p><code>kubectl top</code> chỉ cho biết <em>bây giờ</em>, <code>kubectl logs</code> mất theo Pod. Sự cố lúc 3 giờ sáng cần lịch sử, log cũ, và một người được báo ngay.</p>
+    <p>Ví von: metric là <strong>đồng hồ trên táp-lô xe</strong>, log là <strong>hộp đen</strong>, alert là <strong>đèn cảnh báo</strong> sáng lên khi kim vượt vạch đỏ.</p>
+    <figure class="diagram">
+      <svg class="dg" viewBox="0 0 720 230" role="img" aria-label="Prometheus scrape shop-api, Grafana và Alertmanager; Alloy gửi log tới Loki"><defs><marker id="k82-h7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker><marker id="k82-a7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker></defs>
+<rect class="ok" x="16" y="30" width="170" height="62" rx="8"/>
+<text x="101" y="56" class="b" text-anchor="middle">Pod shop-api</text>
+<text x="101" y="76" class="s m" text-anchor="middle">GET /metrics</text>
+<rect class="acc" x="276" y="30" width="170" height="62" rx="8"/>
+<text x="361" y="56" class="b" text-anchor="middle">Prometheus</text>
+<text x="361" y="76" class="s" text-anchor="middle">lưu chuỗi thời gian</text>
+<rect class="box" x="536" y="10" width="170" height="44" rx="8"/>
+<text x="621" y="37" class="b" text-anchor="middle">Grafana</text>
+<rect class="warn" x="536" y="68" width="170" height="44" rx="8"/>
+<text x="621" y="95" class="b" text-anchor="middle">Alertmanager</text>
+<path class="ln-a" d="M276,61 H190" marker-end="url(#k82-a7)"/>
+<text x="233" y="52" class="s a" text-anchor="middle">scrape 30s</text>
+<path class="ln" d="M536,32 L450,52" marker-end="url(#k82-h7)"/>
+<path class="ln" d="M446,72 L532,88" marker-end="url(#k82-h7)"/>
+<text x="361" y="112" class="s" text-anchor="middle">ServiceMonitor chỉ chỗ scrape</text>
+<rect class="zone" x="16" y="140" width="690" height="80" rx="10"/>
+<text x="32" y="162" class="b">Log</text>
+<rect class="box" x="60" y="172" width="190" height="36" rx="6"/>
+<text x="155" y="195" class="s" text-anchor="middle">Alloy (DaemonSet)</text>
+<rect class="box" x="306" y="172" width="150" height="36" rx="6"/>
+<text x="381" y="195" class="s" text-anchor="middle">Loki</text>
+<rect class="box" x="512" y="172" width="150" height="36" rx="6"/>
+<text x="587" y="195" class="s" text-anchor="middle">Grafana</text>
+<path class="ln dash" d="M250,190 H302" marker-end="url(#k82-h7)"/>
+<path class="ln dash" d="M508,190 H460" marker-end="url(#k82-h7)"/>
+      </svg>
+      <figcaption>Metric: Prometheus đi kéo. Log: agent trên mỗi node đẩy về Loki. Grafana xem cả hai.</figcaption>
+    </figure>
+
+    <h2>Làm từng bước: đưa shop-api vào Prometheus</h2>
+    <h3>Bước 1 — Cài kube-prometheus-stack</h3>
+    <div class="term" data-title="zsh — kind-lab"><pre>$ helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+"prometheus-community" has been added to your repositories
+
+$ helm install monitoring prometheus-community/kube-prometheus-stack -n monitoring --create-namespace
+NAME: monitoring
+LAST DEPLOYED: Mon Nov 16 10:05:42 2026
+NAMESPACE: monitoring
+STATUS: deployed
+REVISION: 1
+
+$ kubectl get pods -n monitoring
+NAME                                                     READY   STATUS    RESTARTS   AGE
+alertmanager-monitoring-kube-prometheus-alertmanager-0   2/2     Running   0          90s
+monitoring-grafana-6d8f7b9c4-k2xqp                       3/3     Running   0          95s
+monitoring-kube-prometheus-operator-7c9d8b6f5-m4tnw      1/1     Running   0          95s
+monitoring-kube-state-metrics-5b8c7d9f6-q8wzr            1/1     Running   0          95s
+monitoring-prometheus-node-exporter-x7lkp                1/1     Running   0          95s
+prometheus-monitoring-kube-prometheus-prometheus-0       2/2     Running   0          90s</pre></div>
+    <p>Một lệnh ra cả bộ: <strong>operator</strong> (đọc ServiceMonitor — Operator pattern ở bài Lưu dữ liệu), <strong>kube-state-metrics</strong> (restart, replicas…), <strong>node-exporter</strong> (DaemonSet, metric từng node) và Grafana có sẵn dashboard.</p>
+
+    <h3>Bước 2 — Đặt nhãn và tên cổng cho Service</h3>
+<pre data-file="shop-api.yaml (phần Service)" data-add="5-6,11-12"><code class="language-yaml">apiVersion: v1
+kind: Service
+metadata:
+  name: shop-api
+  labels:
+    app: shop-api
+spec:
+  selector:
+    app: shop-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: 9898</code></pre>
+    <p>ServiceMonitor tìm Service bằng nhãn và chọn cổng bằng tên — Service ở bài 5 chưa có cả hai. podinfo phục vụ <code>/metrics</code> trên cổng 9898.</p>
+
+    <h3>Bước 3 — ServiceMonitor</h3>
+<pre data-file="shop-api-monitor.yaml" data-add="1-14"><code class="language-yaml">apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: shop-api
+  labels:
+    release: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: shop-api
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s</code></pre>
+    <div class="term" data-title="zsh — kind-lab / shop"><pre>$ kubectl apply -f shop-api.yaml -f shop-api-monitor.yaml
+configmap/shop-api-config unchanged
+deployment.apps/shop-api unchanged
+service/shop-api configured
+ingress.networking.k8s.io/shop-api unchanged
+servicemonitor.monitoring.coreos.com/shop-api created
+
+$ kubectl port-forward -n monitoring svc/monitoring-kube-prometheus-prometheus 9090:9090
+Forwarding from 127.0.0.1:9090 -&gt; 9090</pre></div>
+    <p>Trang <em>Status → Target health</em> của <code>localhost:9090</code>: sau khoảng một phút có <code>serviceMonitor/shop/shop-api/0</code> với 2 endpoint <code>UP</code> (mỗi Pod một). Thử PromQL:</p>
+    <table>
+      <thead><tr><th>PromQL</th><th>Ý nghĩa</th></tr></thead>
+      <tbody>
+        <tr><td><code>up{namespace="shop"}</code></td><td>1 = scrape được, 0 = không với tới</td></tr>
+        <tr><td><code>sum by (pod) (rate(container_cpu_usage_seconds_total{namespace="shop"}[5m]))</code></td><td>CPU từng Pod trong 5 phút qua</td></tr>
+        <tr><td><code>increase(kube_pod_container_status_restarts_total{namespace="shop"}[1h])</code></td><td>Số lần restart trong 1 giờ — nền cho cảnh báo</td></tr>
+      </tbody>
+    </table>
+    <p>Grafana: <code>kubectl port-forward -n monitoring svc/monitoring-grafana 3000:80</code>, user <code>admin</code>, mật khẩu đọc từ Secret <code>monitoring-grafana</code> (key <code>admin-password</code>).</p>
+
+    <div class="callout warning" data-title="Mình đã bị dính chỗ này"><p>ServiceMonitor đầu tiên của mình thiếu nhãn <code>release: monitoring</code>: apply không lỗi, nhưng target không bao giờ hiện. Prometheus của chart chỉ nhận ServiceMonitor có nhãn release trùng tên release Helm.</p></div>
+
+    <h2>Tự kiểm tra</h2>
+    <div class="qa-list">
+      <details><summary>Prometheus kéo hay app đẩy metric?</summary><p>Prometheus kéo: định kỳ gọi /metrics của từng target mà ServiceMonitor chỉ ra.</p></details>
+      <details><summary>ServiceMonitor đúng cú pháp nhưng target không hiện. Kiểm tra ba chỗ nào?</summary><p>Nhãn release trên ServiceMonitor; nhãn của Service có khớp selector không; tên cổng trong Service có khớp endpoints.port không.</p></details>
+      <details><summary>Pod bị xóa hôm qua, muốn đọc log của nó. Cần gì?</summary><p>Log tập trung: agent DaemonSet (Alloy, Fluent Bit) gửi log về Loki hoặc Elasticsearch.</p></details>
+    </div>
+
+    <h2>Hỏi AI để đi sâu hơn</h2>
+    <ul>
+      <li>“Viết PrometheusRule cảnh báo khi Pod trong namespace shop restart quá 3 lần trong 1 giờ, và cấu hình Alertmanager gửi về Slack.”</li>
+      <li>“Cài Loki và Grafana Alloy trên kind để thu log mọi Pod; viết câu LogQL lọc log lỗi của shop-api.”</li>
+      <li>“Giải thích Four Golden Signals, RED và USE, rồi gợi ý dashboard Grafana cho một HTTP API.”</li>
+    </ul>
   </section>
 
 </main>

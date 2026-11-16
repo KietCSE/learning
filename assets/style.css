@@ -279,7 +279,19 @@ div.topic-card .title { color: var(--text); }
 .qa-list details[open] summary::before { transform: rotate(45deg); }
 .qa-list details > :not(summary) { margin: 0; padding: 0 16px 14px 34px; color: var(--muted); font-size: 15px; }
 
-.next-card { display: flex; align-items: center; gap: 16px; border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; background: var(--card); color: var(--text); text-decoration: none; margin-top: 44px; }
+.done-box { margin-top: 44px; display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--alt); font-size: 15px; }
+.done-box > span { flex: 1; min-width: 220px; }
+.done-box .muted { color: var(--muted); }
+.done-box.is-done { background: var(--ok-soft); border-color: var(--ok-line); }
+.done-box.is-done > .icon { color: var(--ok); width: 20px; height: 20px; }
+.btn-done { height: 40px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent); font-weight: 600; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+.btn-done:hover { filter: brightness(1.08); }
+.btn-link { border: 0; background: none; color: var(--muted); font-size: 14px; text-decoration: underline; cursor: pointer; padding: 4px; }
+.btn-link:hover { color: var(--text); }
+.nav-group a .done-mark { display: none; }
+.nav-group a.is-done .done-mark { display: inline-flex; }
+
+.next-card { display: flex; align-items: center; gap: 16px; border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; background: var(--card); color: var(--text); text-decoration: none; margin-top: 16px; }
 .next-card:hover { border-color: var(--accent); color: var(--text); }
 .next-card .ic { width: 40px; height: 40px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .next-card small { display: block; font-size: 13px; color: var(--muted); }

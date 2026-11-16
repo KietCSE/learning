@@ -19,8 +19,24 @@
       s.dataset.n = i + 1;
       if (!s.id) s.id = "bai-" + (i + 1);
     });
-    var doneCount = lessons.filter(function (s) { return s.dataset.done === "true"; }).length;
     var total = lessons.length;
+
+    /* ---------- trạng thái đã học: data-done trong file HOẶC đánh dấu trong trình duyệt ---------- */
+    var STORE = "lh-done:" + topicId;
+    var localDone = [];
+    try { localDone = JSON.parse(localStorage.getItem(STORE)) || []; } catch (e) {}
+    function isDone(s) { return s.dataset.done === "true" || localDone.indexOf(s.id) !== -1; }
+    function countDone() { return lessons.filter(isDone).length; }
+    function setDone(s, done) {
+      var i = localDone.indexOf(s.id);
+      if (done && i === -1) localDone.push(s.id);
+      if (!done && i !== -1) localDone.splice(i, 1);
+      try {
+        localStorage.setItem(STORE, JSON.stringify(localDone));
+        localStorage.setItem("lh-progress:" + topicId, String(countDone()));   // portal đọc số này
+      } catch (e) {}
+    }
+    try { localStorage.setItem("lh-progress:" + topicId, String(countDone())); } catch (e) {}
     var totalMin = lessons.reduce(function (a, s) { return a + (+s.dataset.minutes || 0) + (+s.dataset.practice || 0); }, 0);
     var hoursLabel = totalMin ? " · ≈ " + Math.round(totalMin / 60) + " giờ học" : "";
 
@@ -33,7 +49,7 @@
       "</div></header>" +
       '<div class="subbar"><div class="inner">' +
         '<div class="name"><button type="button" class="nav-toggle" aria-expanded="false" aria-controls="lesson-nav">' + I.list + "Bài học</button><b>" + esc(topicTitle) + "</b><span>" + esc(topic.category ? topic.category + " · " : "") + total + " bài" + hoursLabel + "</span></div>" +
-        '<div class="prog"><span>Đã học ' + doneCount + "/" + total + '</span><span class="progress"><span style="width:' + (total ? Math.round(doneCount / total * 100) : 0) + '%"></span></span></div>' +
+        '<div class="prog"><span id="prog-text"></span><span class="progress"><span id="prog-bar"></span></span></div>' +
       "</div></div>" +
       '<div class="layout">' +
         '<nav class="lesson-nav" id="lesson-nav" aria-label="Danh sách bài">' +
@@ -46,6 +62,7 @@
             '<h1 id="lesson-title"></h1>' +
             '<div class="meta" id="lesson-meta"></div>' +
             '<div id="lesson-body"></div>' +
+            '<div id="done-slot"></div>' +
             '<div id="next-slot"></div>' +
             '<nav class="pager" id="pager" aria-label="Chuyển bài"></nav>' +
           "</article>" +
@@ -140,7 +157,7 @@
     groupsEl.innerHTML = parts.map(function (g) {
       return '<div class="nav-group" data-open="true"><button type="button" aria-expanded="true">' + I.chevron + esc(g.name) + "</button><ul>" +
         g.items.map(function (s) {
-          return '<li><a href="#' + s.id + '" data-lesson="' + s.id + '"><span class="n">' + s.dataset.n + '</span><span class="t">' + esc(s.dataset.title || "") + "</span>" + (s.dataset.done === "true" ? I.check.replace("<svg", '<svg role="img" aria-label="Đã học"').replace('aria-hidden="true"', "") : "") + "</a></li>";
+          return '<li><a href="#' + s.id + '" data-lesson="' + s.id + '"><span class="n">' + s.dataset.n + '</span><span class="t">' + esc(s.dataset.title || "") + "</span>" + '<span class="done-mark" title="Đã học">' + I.check + "</span></a></li>";
         }).join("") + "</ul></div>";
     }).join("");
     groupsEl.querySelectorAll(".nav-group > button").forEach(function (b) {
@@ -168,6 +185,43 @@
     toggle.addEventListener("click", function () {
       var open = !nav.classList.contains("open");
       nav.classList.toggle("open", open); toggle.setAttribute("aria-expanded", open);
+    });
+
+    /* ---------- cập nhật mọi chỗ hiển thị tiến độ ---------- */
+    var currentIdx = -1;
+    function refreshProgress() {
+      var n = countDone();
+      document.getElementById("prog-text").textContent = "Đã học " + n + "/" + total;
+      document.getElementById("prog-bar").style.width = (total ? Math.round(n / total * 100) : 0) + "%";
+      groupsEl.querySelectorAll("a[data-lesson]").forEach(function (a) {
+        var s = document.getElementById(a.getAttribute("data-lesson"));
+        a.classList.toggle("is-done", !!s && isDone(s));
+      });
+      if (currentIdx < 0) return;
+      var s = lessons[currentIdx], done = isDone(s);
+      var pill = document.getElementById("lesson-pill");
+      if (pill) {
+        pill.className = "pill" + (done ? " done" : "");
+        pill.textContent = "Bài " + (currentIdx + 1) + " / " + total + (done ? " · đã học" : "");
+      }
+      var slot = document.getElementById("done-slot");
+      if (s.dataset.done === "true") {
+        slot.innerHTML = '<div class="done-box is-done">' + I.check + "<span><b>Đã học xong bài này.</b></span></div>";
+      } else if (done) {
+        slot.innerHTML = '<div class="done-box is-done">' + I.check + '<span><b>Đã học xong bài này.</b> <span class="muted">Đánh dấu lưu trên trình duyệt này.</span></span>' +
+          '<button type="button" class="btn-link" data-undo>Bỏ đánh dấu</button></div>';
+      } else {
+        slot.innerHTML = '<div class="done-box"><span><b>Học xong bài này?</b> <span class="muted">Đã chạy lại các lệnh và trả lời được phần Tự kiểm tra.</span></span>' +
+          '<button type="button" class="btn-done" data-mark>' + I.check + "Đánh dấu đã học</button></div>";
+      }
+    }
+    document.getElementById("done-slot").addEventListener("click", function (e) {
+      if (currentIdx < 0) return;
+      var s = lessons[currentIdx];
+      if (e.target.closest("[data-mark]")) setDone(s, true);
+      else if (e.target.closest("[data-undo]")) setDone(s, false);
+      else return;
+      refreshProgress();
     });
 
     /* ---------- show a lesson ---------- */
@@ -209,7 +263,8 @@
         '<li><a href="../index.html">Learning hub</a></li><li aria-hidden="true">/</li>' +
         "<li><a href=\"#" + lessons[0].id + "\">" + esc(topicTitle) + "</a></li>" +
         (s.dataset.part ? '<li aria-hidden="true">/</li><li>' + esc(s.dataset.part) + "</li>" : "");
-      var meta = '<span class="pill' + (s.dataset.done === "true" ? " done" : "") + '">Bài ' + (idx + 1) + " / " + total + (s.dataset.done === "true" ? " · đã học" : "") + "</span>";
+      currentIdx = idx;
+      var meta = '<span class="pill" id="lesson-pill"></span>';
       if (s.dataset.minutes) meta += "<span>" + I.clock + "Đọc " + s.dataset.minutes + " phút</span>";
       if (+s.dataset.practice > 0) meta += "<span>" + I.terminal + "Thực hành " + s.dataset.practice + " phút</span>";
       if (s.dataset.updated) meta += "<span>" + I.calendar + "Cập nhật " + esc(LH.viDate(s.dataset.updated)) + "</span>";
@@ -238,6 +293,7 @@
       });
       activeHeads = heads;
       spy();
+      refreshProgress();
 
       nav.classList.remove("open"); toggle.setAttribute("aria-expanded", "false");
       if (!keepScroll) window.scrollTo(0, 0);
@@ -251,7 +307,7 @@
       var el = id && document.getElementById(id);
       var owner = el && el.closest && el.closest("section.lesson");
       if (owner) { show(owner.id, true); el.scrollIntoView(); return; }
-      var firstTodo = lessons.filter(function (s) { return s.dataset.done !== "true"; })[0] || lessons[0];
+      var firstTodo = lessons.filter(function (s) { return !isDone(s); })[0] || lessons[0];
       if (firstTodo) show(firstTodo.id, true);
     }
     window.addEventListener("hashchange", function () { route(false); });
