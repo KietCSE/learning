@@ -51,6 +51,18 @@ window.LEARNING = {
       done: 0,
       estimate: "≈ 12 giờ",
       updated: "2026-11-16"
+    },
+    {
+      id: "ml-du-doan-dau-tim",
+      title: "Machine Learning: dự đoán đau tim",
+      category: "AI/ML",
+      status: "learning",
+      desc: "ML cổ điển qua một project từ đầu tới cuối, theo đúng 8 section của khóa Udemy (Oak Academy): hiểu dữ liệu, EDA từng biến và hai biến, chuẩn bị dữ liệu, train 4 model và đánh giá đúng cách.",
+      file: "topics/ml-du-doan-dau-tim.html",
+      lessons: 29,
+      done: 0,
+      estimate: "≈ 14,5 giờ",
+      updated: "2026-11-22"
     }
   ]
 };
